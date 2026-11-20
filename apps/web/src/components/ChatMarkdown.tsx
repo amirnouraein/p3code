@@ -270,6 +270,8 @@ interface ChatMarkdownProps {
   onImageExpand?: ((preview: ExpandedImagePreview) => void) | undefined;
   /** Keep one list per configuration (a module constant): it keys the shared parse cache. */
   extraRemarkPlugins?: NonNullable<ReactMarkdownOptions["remarkPlugins"]>;
+  /** Runs after sanitizing; keep one list per configuration, like `extraRemarkPlugins`. */
+  extraRehypePlugins?: NonNullable<ReactMarkdownOptions["rehypePlugins"]>;
   renderContextReference?: ((reference: ChatMarkdownContextReference) => ReactNode) | undefined;
   /** Loads media a source control host keeps behind a credential through the server, which holds
       `cwd`'s; without it a private repository's uploads load unauthenticated and 404. */
@@ -1931,6 +1933,7 @@ function ChatMarkdown({
   lineBreaks = false,
   parseRawHtml = true,
   extraRemarkPlugins = EMPTY_REMARK_PLUGINS,
+  extraRehypePlugins = EMPTY_REMARK_PLUGINS,
   renderInsights = false,
   ...props
 }: ChatMarkdownProps) {
@@ -1996,11 +1999,12 @@ function ChatMarkdown({
             key={index}
             text={source}
             remarkPlugins={remarkPlugins}
-            rehypePlugins={
+            rehypePlugins={withExtraPlugins(
               parseRawHtml
                 ? CHAT_MARKDOWN_RENDER_REHYPE_PLUGINS
-                : CHAT_MARKDOWN_LITERAL_HTML_REHYPE_PLUGINS
-            }
+                : CHAT_MARKDOWN_LITERAL_HTML_REHYPE_PLUGINS,
+              extraRehypePlugins,
+            )}
             shared={!uncachedPlugins}
             // Every block before the last is finished, so its parse can be reused.
             cache={!props.isStreaming || index < blocks.length - 1}

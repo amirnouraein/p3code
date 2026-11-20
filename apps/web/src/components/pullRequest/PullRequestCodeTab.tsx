@@ -47,7 +47,10 @@ import {
   TriangleAlertIcon,
   ChevronsDownUpIcon,
   ChevronsUpDownIcon,
+  CodeIcon,
+  EyeIcon,
 } from "lucide-react";
+import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
 import { RegistryContext, useAtomRefresh, useAtomValue } from "@effect/atom-react";
 import { AsyncResult, Atom } from "effect/reactivity";
 import * as Schema from "effect/Schema";
@@ -146,6 +149,11 @@ import { getFileViewedRange, isLineInFileDiff } from "./pullRequestDiff.logic";
 import { PullRequestDiffStat, PullRequestMetaLine } from "./pullRequestPresentation";
 import { PullRequestDiffUnavailableState } from "./PullRequestDiffUnavailableState";
 import { usePullRequestFilesViewed } from "./usePullRequestFilesViewed";
+import { isMarkdownPreviewFile } from "../files/filePreviewMode";
+import {
+  PullRequestMarkdownPreview,
+  type MarkdownPreviewAnnotation,
+} from "./PullRequestMarkdownPreview";
 import { hasCutLines } from "@t3tools/shared/diffCutLines";
 import { CUT_LINES_CSS, markCutLineNotes } from "./cutLineNotes";
 import {
@@ -164,6 +172,13 @@ interface ReviewAnnotationGroup {
   readonly draft: boolean;
   readonly image?: { readonly url: string; readonly path: string };
   readonly withheld?: { readonly path: string; readonly status: WithheldFileStatus };
+  /** A Markdown file shown rendered, carrying the annotations its diff rows would have held. */
+  readonly preview?: {
+    readonly fileKey: string;
+    readonly path: string;
+    readonly contents: Promise<string>;
+    readonly annotations: ReadonlyArray<ReviewAnnotation>;
+  };
 }
 
 type WithheldFileStatus = "idle" | "loading" | "error" | "empty";
@@ -397,6 +412,20 @@ function buildFileDiffFoldKey(fileDiff: FileDiffMetadata): string {
     : buildFileDiffRenderKey(fileDiff);
 }
 
+function withoutDiffRows(fileDiff: FileDiffMetadata): FileDiffMetadata {
+  return {
+    ...fileDiff,
+    hunks: [],
+    splitLineCount: 0,
+    unifiedLineCount: 0,
+    isPartial: true,
+    additionLines: [],
+    deletionLines: [],
+    additionCharacterCount: 0,
+    deletionCharacterCount: 0,
+  };
+}
+
 function isRemovedLine(fileDiff: FileDiffMetadata, oldLine: number): boolean {
   return fileDiff.hunks.some((hunk) => {
     let next = hunk.deletionStart;
@@ -490,6 +519,9 @@ function PullRequestCodeTab({
   const [draft, setDraft] = useState<DraftAnchor | null>(null);
   const [threadPending, setThreadPending] = useState(false);
   const [orphansOpen, setOrphansOpen] = useState(false);
+  const [previewPaths, setPreviewPaths] = useState<ReadonlySet<string>>(() => new Set());
+  // One read per file and revision, kept across virtualized remounts of the preview row.
+  const [previewContents] = useState(() => new Map<string, Promise<string>>());
   // Scope slices before reset to prevent using a previous pull request's data or cursor.
   const [sliceState, setSliceState] = useState<{
     readonly key: string;
@@ -516,6 +548,7 @@ function PullRequestCodeTab({
     setFolds(EMPTY_PULL_REQUEST_DIFF_FOLDS);
     setVisibleCommitCount(COMMIT_PAGE_SIZE);
     setOrphansOpen(false);
+    setPreviewPaths(new Set());
     setSliceState({ key: scopeKey, cursor: null, slices: NO_SLICES });
   }
 
@@ -668,6 +701,31 @@ function PullRequestCodeTab({
     commit,
     cacheKey: `pull-request:${referenceKey}:${detail.updatedAt}:${commit ?? "all"}`,
   });
+  const previewCacheKey = `pull-request:${referenceKey}:${detail.updatedAt}:${commit ?? "all"}`;
+  const markdownContents = (fileDiff: FileDiffMetadata, path: string) => {
+    const key = `${previewCacheKey}:${path}`;
+    const cached = previewContents.get(key);
+    if (cached !== undefined) return cached;
+    const contents = getDiffFileContents({
+      environmentId,
+      input: {
+        ...reference,
+        ...(commit === null ? {} : { commit }),
+        changeType: fileDiff.type,
+        oldPath: resolveFileDiffPreviousPath(fileDiff),
+        newPath: path,
+      },
+    }).then((result) => {
+      if (result._tag === "Success") return result.value.newContents;
+      // A later remount of the preview retries instead of keeping the failure.
+      previewContents.delete(key);
+      throw squashAtomCommandFailure(result);
+    });
+    previewContents.set(key, contents);
+    return contents;
+  };
+  const isPreviewing = (fileDiff: FileDiffMetadata, path: string) =>
+    previewPaths.has(path) && isMarkdownPreviewFile(path) && fileDiff.type !== "deleted";
   const completionScope = pullRequestCompletionScope(detail, environmentId, reference);
   const hostReview = detail.capabilities.review;
   const review = {
@@ -891,38 +949,61 @@ function PullRequestCodeTab({
         },
       });
     }
+    const previewing = isPreviewing(fileDiff, path);
     return {
       fileKey,
       foldKey: buildFileDiffFoldKey(fileDiff),
       path,
       fileDiff,
-      annotations,
+      previewing,
+      annotations: previewing
+        ? [
+            {
+              side: "additions" as const,
+              lineNumber: 0,
+              metadata: {
+                threads: [],
+                pending: [],
+                draft: false,
+                preview: {
+                  fileKey,
+                  path,
+                  contents: markdownContents(fileDiff, path),
+                  annotations,
+                },
+              },
+            },
+          ]
+        : annotations,
       // The viewer redraws annotations only when their version changes.
       annotationsVersion: fnv1a32(
-        annotations
-          .map(
-            ({ side, lineNumber, metadata }) =>
-              `${side}:${lineNumber}:${metadata.image?.url ?? ""}:${metadata.withheld?.status ?? ""}:${metadata.draft ? "d" : ""}:${metadata.pending
-                .map((comment) => `${comment.id}:${comment.body}`)
-                .join(",")}:${metadata.threads
-                .map(
-                  (thread) =>
-                    `${thread.id}:${thread.isResolved ? "r" : ""}:${
-                      thread.isOutdated ? "o" : ""
-                    }:${thread.comments
-                      .map(
-                        (comment) =>
-                          `${comment.id}:${comment.author?.login ?? ""}:${comment.createdAt}:${comment.body}:${(
-                            comment.reactions ?? []
-                          )
-                            .map((r) => `${r.content}:${r.count}:${r.viewerHasReacted ? "v" : ""}`)
-                            .join(",")}`,
-                      )
-                      .join(";")}`,
-                )
-                .join(",")}`,
-          )
-          .join("|"),
+        (previewing ? `preview:${previewCacheKey}|` : "") +
+          annotations
+            .map(
+              ({ side, lineNumber, metadata }) =>
+                `${side}:${lineNumber}:${metadata.image?.url ?? ""}:${metadata.withheld?.status ?? ""}:${metadata.draft ? "d" : ""}:${metadata.pending
+                  .map((comment) => `${comment.id}:${comment.body}`)
+                  .join(",")}:${metadata.threads
+                  .map(
+                    (thread) =>
+                      `${thread.id}:${thread.isResolved ? "r" : ""}:${
+                        thread.isOutdated ? "o" : ""
+                      }:${thread.comments
+                        .map(
+                          (comment) =>
+                            `${comment.id}:${comment.author?.login ?? ""}:${comment.createdAt}:${comment.body}:${(
+                              comment.reactions ?? []
+                            )
+                              .map(
+                                (r) => `${r.content}:${r.count}:${r.viewerHasReacted ? "v" : ""}`,
+                              )
+                              .join(",")}`,
+                        )
+                        .join(";")}`,
+                  )
+                  .join(",")}`,
+            )
+            .join("|"),
       ),
     };
   });
@@ -963,7 +1044,7 @@ function PullRequestCodeTab({
   const foldsAsViewed = (path: string) =>
     filesViewedEnabled && isFileViewed(path) && !isFileViewedStale(path);
   const items: CodeViewDiffItem<ReviewAnnotationGroup>[] = annotatedFiles.map(
-    ({ fileKey, foldKey, path, fileDiff, annotations, annotationsVersion }) => {
+    ({ fileKey, foldKey, path, fileDiff, previewing, annotations, annotationsVersion }) => {
       const group = foldGroup(path);
       const collapsed = isFileDiffCollapsed(
         foldKey,
@@ -977,7 +1058,8 @@ function PullRequestCodeTab({
       return {
         id: fileKey,
         type: "diff" as const,
-        fileDiff,
+        // The rendered file replaces the rows, the way an image's preview does.
+        fileDiff: previewing ? withoutDiffRows(fileDiff) : fileDiff,
         annotations,
         collapsed,
         version: fnv1a32(`${collapsed ? "1" : "0"}:${viewedMark}:${annotationsVersion}`),
@@ -1074,14 +1156,9 @@ function PullRequestCodeTab({
       (left, right) => Date.parse(right.committedDate) - Date.parse(left.committedDate),
     );
 
-  const beginComment = (
-    range: SelectedLineRange | null,
-    context: { item: CodeViewItem<ReviewAnnotationGroup> },
-  ) => {
+  const beginFileComment = (fileKey: string, range: SelectedLineRange | null) => {
     if (!range || !canSelectLines || withheldRefetching) return;
-    const item = context.item;
-    if (item.type !== "diff") return;
-    const file = files.find((candidate) => buildFileDiffRenderKey(candidate) === item.id);
+    const file = files.find((candidate) => buildFileDiffRenderKey(candidate) === fileKey);
     if (!file) return;
     // On a host without ranged comments a range collapses to its last line: one that silently
     // lost its first line there would be worse than one line.
@@ -1095,12 +1172,19 @@ function PullRequestCodeTab({
       resolveDiffReviewAnchor(file, range, rangeComments);
     if (anchor === null) return;
     setDraft({
-      fileKey: item.id,
+      fileKey,
       path,
       oldPath: previousPath === path ? null : previousPath,
       ...anchor,
       range,
     });
+  };
+
+  const beginComment = (
+    range: SelectedLineRange | null,
+    context: { item: CodeViewItem<ReviewAnnotationGroup> },
+  ) => {
+    if (context.item.type === "diff") beginFileComment(context.item.id, range);
   };
 
   const finishSelection = (
@@ -1180,7 +1264,7 @@ function PullRequestCodeTab({
       const withheld = omittedFileStats.get(path);
       if (withheld) ({ additions, deletions } = withheld);
     }
-    return (
+    const viewedToggle = (
       <FileViewedToggle
         fileKey={item.id}
         path={path}
@@ -1192,6 +1276,37 @@ function PullRequestCodeTab({
           />
         }
       />
+    );
+    if (!isMarkdownPreviewFile(path) || item.fileDiff.type === "deleted") return viewedToggle;
+    const previewing = previewPaths.has(path);
+    const label = previewing ? gt("Show diff") : gt("Preview Markdown");
+    return (
+      <span className="flex items-center gap-3">
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                size="icon-micro"
+                variant="ghost-muted"
+                aria-label={label}
+                aria-pressed={previewing}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setPreviewPaths((current) => {
+                    const next = new Set(current);
+                    if (!next.delete(path)) next.add(path);
+                    return next;
+                  });
+                }}
+              />
+            }
+          >
+            {previewing ? <CodeIcon /> : <EyeIcon />}
+          </TooltipTrigger>
+          <TooltipPopup side="bottom">{label}</TooltipPopup>
+        </Tooltip>
+        {viewedToggle}
+      </span>
     );
   };
 
@@ -1323,38 +1438,71 @@ function PullRequestCodeTab({
     />
   );
 
-  const renderAnnotation = (...[annotation]: CodeViewAnnotationArgs<ReviewAnnotationGroup>) => (
+  const renderAnnotation = (...[annotation]: CodeViewAnnotationArgs<ReviewAnnotationGroup>) =>
+    annotation.metadata.preview
+      ? renderMarkdownPreview(annotation.metadata.preview)
+      : renderAnnotationBody(annotation.metadata);
+
+  const renderMarkdownPreview = (preview: NonNullable<ReviewAnnotationGroup["preview"]>) => {
+    const file = files.find((candidate) => buildFileDiffRenderKey(candidate) === preview.fileKey);
+    const commentable =
+      file !== undefined && canSelectLines && draft === null && !withheldRefetching;
+    const annotations: MarkdownPreviewAnnotation[] = preview.annotations.map(
+      ({ side, lineNumber, metadata }) => ({
+        key: `${side}:${lineNumber}`,
+        side,
+        line: lineNumber,
+        content: renderAnnotationBody(metadata),
+      }),
+    );
+    return (
+      <PullRequestMarkdownPreview
+        contents={preview.contents}
+        path={preview.path}
+        cwd={detail.workspaceRoot}
+        environmentId={environmentId}
+        repository={detail.repository}
+        annotations={annotations}
+        {...(commentable
+          ? { inDiff: (line: number) => isLineInFileDiff(file, "right", line) }
+          : {})}
+        onComment={(range) => beginFileComment(preview.fileKey, { ...range, side: "additions" })}
+      />
+    );
+  };
+
+  const renderAnnotationBody = (metadata: ReviewAnnotationGroup) => (
     // Folded resolved conversations alone add no row, so the code reads straight through.
     <div className="relative font-sans text-foreground has-[>:not([data-resolved-threads])]:py-1">
-      {annotation.metadata.image ? (
+      {metadata.image ? (
         <div className="flex justify-center p-3">
           <ChatMarkdownAssetImage
             environmentId={environmentId}
             resource={{
               _tag: SOURCE_CONTROL_MEDIA_ASSET,
               cwd: detail.workspaceRoot,
-              url: annotation.metadata.image.url,
+              url: metadata.image.url,
               repository: detail.repository,
             }}
-            alt={annotation.metadata.image.path}
+            alt={metadata.image.path}
           />
         </div>
       ) : null}
-      {annotation.metadata.withheld ? (
+      {metadata.withheld ? (
         <WithheldFileNotice
-          {...annotation.metadata.withheld}
+          {...metadata.withheld}
           onLoad={withheldFilesReadable ? loadWithheldFile : undefined}
         />
       ) : null}
-      <InlineReviewThreads threads={annotation.metadata.threads} renderThread={renderThreadCard} />
-      {annotation.metadata.pending.map((comment) => (
+      <InlineReviewThreads threads={metadata.threads} renderThread={renderThreadCard} />
+      {metadata.pending.map((comment) => (
         <PendingReviewCommentCard
           key={comment.id}
           comment={comment}
           onRemove={() => removeComment(reviewKey, comment.id)}
         />
       ))}
-      {annotation.metadata.draft && draft && canSelectLines ? (
+      {metadata.draft && draft && canSelectLines ? (
         <DiffCommentAnnotation
           environmentId={environmentId}
           projectId={reference.projectId}
