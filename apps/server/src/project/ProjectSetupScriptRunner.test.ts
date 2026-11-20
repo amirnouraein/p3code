@@ -50,11 +50,13 @@ const makeHarness = Effect.fn(function* (options: {
 }) {
   const listeners = new Set<(event: TerminalEvent) => Effect.Effect<void>>();
   const opens: TerminalOpenInput[] = [];
+  const opened = yield* Queue.unbounded<void>();
   const writes = yield* Queue.unbounded<string>();
   const outputLines = yield* Queue.unbounded<string>();
   const terminals = Layer.mock(TerminalManager.TerminalManager)({
     open: (input) =>
       Effect.sync(() => opens.push(input)).pipe(
+        Effect.andThen(Queue.offer(opened, undefined)),
         Effect.andThen(
           options.opening
             ? Deferred.succeed(options.opening, undefined).pipe(Effect.andThen(Effect.never))
@@ -108,7 +110,7 @@ const makeHarness = Effect.fn(function* (options: {
   });
   const emit = (terminalEvent: TerminalEvent) =>
     Effect.forEach([...listeners], (listener) => listener(terminalEvent), { discard: true });
-  return { start, listeners, writes, outputLines, emit, opens };
+  return { runner, start, listeners, writes, outputLines, emit, opens, opened };
 });
 
 const setup = Effect.fn(function* (
@@ -158,8 +160,9 @@ describe("ProjectSetupScriptRunner", () => {
       expect(written).toBe(
         ` ${[
           "$env.LAST_EXIT_CODE = 0",
-          "let __t3f = try { mktemp --tmpdir-path $env.T3CODE_WORKTREE_PATH --suffix .nu .t3-setup-XXXXXXXX } catch {|e| print -e $e.msg; null }",
-          `if $__t3f == null { $env.LAST_EXIT_CODE = 1 } else { try { [$"rm --permanent ($__t3f | to nuon)" "${escaped}"] | str join (char newline) | save --force --raw $__t3f; ^$nu.current-exe --login --commands $"cd $env.T3CODE_WORKTREE_PATH; source ($__t3f | to nuon)" } catch {|e| if $e != null and $e.exit_code? == null { print -e $e.msg }; if $env.LAST_EXIT_CODE == 0 { $env.LAST_EXIT_CODE = 1 } } }`,
+          "let __t3d = $env.PWD",
+          "let __t3f = try { mktemp --tmpdir-path $__t3d --suffix .nu .t3-setup-XXXXXXXX } catch {|e| print -e $e.msg; null }",
+          `if $__t3f == null { $env.LAST_EXIT_CODE = 1 } else { try { [$"rm --permanent ($__t3f | to nuon)" "${escaped}"] | str join (char newline) | save --force --raw $__t3f; ^$nu.current-exe --login --commands $"cd ($__t3d | to nuon); source ($__t3f | to nuon)" } catch {|e| if $e != null and $e.exit_code? == null { print -e $e.msg }; if $env.LAST_EXIT_CODE == 0 { $env.LAST_EXIT_CODE = 1 } } }`,
           "let __t3c = $env.LAST_EXIT_CODE",
           "try { if $__t3f != null and ($__t3f | path exists) { rm --permanent $__t3f } } catch {|e| print -e $e.msg }",
           `print $"\\n${sentinel}($__t3c)"`,
@@ -236,6 +239,21 @@ describe("ProjectSetupScriptRunner", () => {
       expect(listeners.size).toBe(2);
       yield* Fiber.interrupt(fiber);
       expect(listeners.size).toBe(0);
+    }),
+  );
+
+  it.effect("runs a client command in its own terminal and resolves with the exit code", () =>
+    Effect.gen(function* () {
+      const { runner, writes, emit, opens, opened } = yield* makeHarness({});
+      const run = yield* Effect.forkChild(
+        runner.runCommand({ threadId, terminalId, cwd: "/repo", command: "vp test" }),
+      );
+      yield* Queue.take(opened);
+      expect(opens[0]).toMatchObject({ terminalId, cwd: "/repo", worktreePath: null });
+      yield* emit({ ...event, type: "output", data: "% \x1b[?2004h" });
+      const sentinel = (yield* Queue.take(writes)).match(/__T3_SETUP_DONE___[0-9a-f]{32}:/)?.[0];
+      yield* emit({ ...event, type: "output", data: `\r\n${sentinel}3\r\n% ` });
+      expect(yield* Fiber.join(run)).toEqual({ exitCode: 3 });
     }),
   );
 

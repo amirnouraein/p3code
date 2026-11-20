@@ -5,6 +5,7 @@ import {
   AuthSettingsWriteScope,
   type EnvironmentId,
   type ProjectScript,
+  type ScopedThreadRef,
   type T3ProjectFileScript,
 } from "@t3tools/contracts";
 import { useAtomValue } from "@effect/atom-react";
@@ -14,7 +15,15 @@ import {
   squashAtomCommandFailure,
 } from "@t3tools/client-runtime/state/runtime";
 import { projectScriptMenuLabel } from "@t3tools/shared/projectScriptsCopy";
-import { ChevronDownIcon, DownloadIcon, PlusIcon, SettingsIcon, WrenchIcon } from "lucide-react";
+import {
+  CheckIcon,
+  ChevronDownIcon,
+  DownloadIcon,
+  PlusIcon,
+  SettingsIcon,
+  WrenchIcon,
+  XIcon,
+} from "lucide-react";
 import React, { useState } from "react";
 import { T, useGT, useMessages, Var } from "gt-react";
 
@@ -31,7 +40,13 @@ import {
   type ProjectScriptActionResult,
   type ProjectScriptEditorRequest,
 } from "./projectScriptEditor";
+import {
+  backgroundScriptRunKey,
+  type BackgroundScriptRun,
+  useBackgroundScriptRunStore,
+} from "~/backgroundScriptRunStore";
 import { Button } from "./ui/button";
+import { Spinner } from "./ui/spinner";
 import { Group, GroupSeparator } from "./ui/group";
 import {
   Menu,
@@ -62,11 +77,32 @@ export type { NewProjectScriptInput, ProjectScriptActionResult };
 
 const NO_FILE_SCRIPTS: ReadonlyArray<T3ProjectFileScript> = [];
 
+function ScriptStatusIcon({
+  script,
+  run,
+  large = false,
+  className = large ? "size-4" : "size-3.5",
+}: {
+  script: ProjectScript;
+  run: BackgroundScriptRun | undefined;
+  large?: boolean;
+  className?: string;
+}) {
+  if (run?.status === "running" || run?.status === "stopping") {
+    return <Spinner size={large ? "md" : "sm"} aria-hidden className="shrink-0" />;
+  }
+  if (run?.status === "succeeded") return <CheckIcon className={cn(className, "text-success")} />;
+  if (run?.status === "failed") return <XIcon className={cn(className, "text-destructive")} />;
+  return <ScriptIcon icon={script.icon} className={className} />;
+}
+
 interface ProjectScriptsControlProps {
   displayMode?: "toolbar" | "panel";
   presentation?: "toolbar" | "menu";
   onRequestMenuClose?: () => void;
   environmentId: EnvironmentId;
+  /** Shows background runs of this thread's scripts. */
+  threadRef?: ScopedThreadRef | null;
   scripts: ReadonlyArray<ProjectScript>;
   fileScripts?: ReadonlyArray<T3ProjectFileScript>;
   preferredScriptId?: string | null;
@@ -84,6 +120,7 @@ export default function ProjectScriptsControl({
   presentation = "toolbar",
   onRequestMenuClose,
   environmentId,
+  threadRef = null,
   scripts,
   fileScripts = NO_FILE_SCRIPTS,
   preferredScriptId = null,
@@ -109,6 +146,13 @@ export default function ProjectScriptsControl({
     setActionsMenuOpen({ presentation, scripts: false, imports: false });
   }
   const [editorRequest, setEditorRequest] = useState<ProjectScriptEditorRequest | null>(null);
+  const backgroundRuns = useBackgroundScriptRunStore((state) => state.runs);
+  const runOf = (script: ProjectScript) =>
+    threadRef ? backgroundRuns[backgroundScriptRunKey(threadRef, script.id)] : undefined;
+  const isRunning = (script: ProjectScript) => {
+    const status = runOf(script)?.status;
+    return status === "running" || status === "stopping";
+  };
   const editorRequestIdRef = React.useRef(0);
 
   const primaryScript =
@@ -217,8 +261,12 @@ export default function ProjectScriptsControl({
             disabled={!onRunScript}
             onClick={() => onRunScript?.(script)}
           >
-            <ScriptIcon icon={script.icon} className="size-4" />
-            <MenuItemLabel>{projectScriptMenuLabel(script, messages)}</MenuItemLabel>
+            <ScriptStatusIcon script={script} run={runOf(script)} large />
+            <MenuItemLabel>
+              {isRunning(script)
+                ? gt("Stop {name}", { name: script.name })
+                : projectScriptMenuLabel(script, messages)}
+            </MenuItemLabel>
             <span className="relative ms-auto flex h-6 min-w-6 items-center justify-end">
               {shortcutLabel &&
                 (presentation === "menu" ? (
@@ -272,11 +320,17 @@ export default function ProjectScriptsControl({
               disabled={!onRunScript}
               onClick={() => onRunScript?.(primaryScript)}
             >
-              <ScriptIcon icon={primaryScript.icon} className="size-4" />
+              <ScriptStatusIcon script={primaryScript} run={runOf(primaryScript)} large />
               <MenuItemLabel>
-                <T>
-                  Run <Var>{primaryScript.name}</Var>
-                </T>
+                {isRunning(primaryScript) ? (
+                  <T>
+                    Stop <Var>{primaryScript.name}</Var>
+                  </T>
+                ) : (
+                  <T>
+                    Run <Var>{primaryScript.name}</Var>
+                  </T>
+                )}
               </MenuItemLabel>
               <MenuShortcut>
                 {shortcutLabelForCommand(keybindings, commandForProjectScript(primaryScript.id))}
@@ -327,7 +381,11 @@ export default function ProjectScriptsControl({
                   part="primary"
                   panel={isPanel}
                   className={isPanel ? undefined : "w-7 sm:w-6 @3xl/header-actions:w-auto!"}
-                  aria-label={gt("Run {name}", { name: primaryScript.name })}
+                  aria-label={
+                    isRunning(primaryScript)
+                      ? gt("Stop {name}", { name: primaryScript.name })
+                      : gt("Run {name}", { name: primaryScript.name })
+                  }
                   // Tooltip replaces the button data-slot, so toolbar theming needs a separate hook.
                   data-toolbar-control=""
                   aria-disabled={!onRunScript || undefined}
@@ -335,9 +393,10 @@ export default function ProjectScriptsControl({
                 />
               }
             >
-              <ScriptIcon
-                icon={primaryScript.icon}
-                {...(isPanel ? { className: THREAD_DETAILS_PANEL_ICON_CLASS } : {})}
+              <ScriptStatusIcon
+                script={primaryScript}
+                run={runOf(primaryScript)}
+                {...(isPanel ? { large: true, className: THREAD_DETAILS_PANEL_ICON_CLASS } : {})}
               />
               <span
                 className={cn(
@@ -349,9 +408,11 @@ export default function ProjectScriptsControl({
               </span>
             </TooltipTrigger>
             <TooltipPopup side="top">
-              {onRunScript
-                ? gt("Run {name}", { name: primaryScript.name })
-                : gt("Pair this client again with permission to run terminal commands.")}
+              {!onRunScript
+                ? gt("Pair this client again with permission to run terminal commands.")
+                : isRunning(primaryScript)
+                  ? gt("Stop {name}", { name: primaryScript.name })
+                  : gt("Run {name}", { name: primaryScript.name })}
             </TooltipPopup>
           </Tooltip>
           {isPanel ? (

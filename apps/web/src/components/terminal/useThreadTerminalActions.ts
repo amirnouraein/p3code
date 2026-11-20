@@ -30,6 +30,9 @@ export function useThreadTerminalActions(threadRef: ScopedThreadRef | null) {
   const openTerminalCommand = useAtomCommand(terminalEnvironment.open, "terminal open");
   const writeTerminal = useAtomCommand(terminalEnvironment.write, "terminal write");
   const closeTerminalCommand = useAtomCommand(terminalEnvironment.close, "terminal close");
+  const runCommand = useAtomCommand(terminalEnvironment.runCommand, {
+    reportFailure: false,
+  });
   const serverThread = useQuietThreadShell(threadRef);
   const draftThread = useComposerDraftStore((store) =>
     threadRef ? store.getDraftThreadByRef(threadRef) : null,
@@ -116,6 +119,36 @@ export function useThreadTerminalActions(threadRef: ScopedThreadRef | null) {
     return { terminalId, result };
   };
 
+  /** Runs a command in a terminal no surface shows; resolves with its exit code. */
+  const runInBackground = (input: {
+    readonly command: string;
+    readonly location: TerminalLaunchLocation;
+    readonly extraEnv?: Record<string, string>;
+    readonly stopOnSettle: boolean;
+  }) => {
+    if (!threadRef || !canWrite() || !project) return null;
+    const terminalId = allocateTerminalId();
+    const result = runCommand({
+      environmentId: threadRef.environmentId,
+      input: {
+        threadId: threadRef.threadId,
+        terminalId,
+        cwd: input.location.cwd,
+        ...(input.location.worktreePath !== null
+          ? { worktreePath: input.location.worktreePath }
+          : {}),
+        env: projectScriptRuntimeEnv({
+          project: { cwd: project.workspaceRoot },
+          worktreePath: input.location.worktreePath,
+          ...(input.extraEnv ? { extraEnv: input.extraEnv } : {}),
+        }),
+        stopOnSettle: input.stopOnSettle,
+        command: input.command,
+      },
+    });
+    return { terminalId, result };
+  };
+
   /** Ends a session and deletes its history. A failed close falls back to typing `exit`. */
   const closeTerminalSession = (terminalId: string, target = threadRef) => {
     if (!target || !readEnvironmentScope(target.environmentId, AuthTerminalOperateScope)) return;
@@ -148,6 +181,7 @@ export function useThreadTerminalActions(threadRef: ScopedThreadRef | null) {
     canWrite: useStableCallback(canWrite),
     allocateTerminalId: useStableCallback(allocateTerminalId),
     launchTerminal: useStableCallback(launchTerminal),
+    runInBackground: useStableCallback(runInBackground),
     closeTerminalSession: useStableCallback(closeTerminalSession),
     writeToTerminal: useStableCallback(writeToTerminal),
   };

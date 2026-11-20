@@ -46,6 +46,11 @@ import {
 } from "../../lib/terminalFocus";
 import { useTerminalUiStateStore } from "../../terminalUiStateStore";
 import {
+  backgroundScriptRunKey,
+  readBackgroundScriptRun,
+  setBackgroundScriptRun,
+} from "../../backgroundScriptRunStore";
+import {
   LAST_INVOKED_SCRIPT_BY_PROJECT_KEY,
   LastInvokedScriptByProjectSchema,
   makeThreadErrorSetter,
@@ -57,6 +62,7 @@ import { useAtomCommand } from "../../state/use-atom-command";
 import type { ChatShortcutCommands } from "./useChatShortcuts";
 const SCRIPT_TERMINAL_COLS = 120;
 const SCRIPT_TERMINAL_ROWS = 30;
+const BACKGROUND_SCRIPT_SUCCESS_MS = 5_000;
 
 export interface TerminalLaunchContext {
   threadId: ThreadId;
@@ -204,6 +210,102 @@ export function useChatTerminalActions(input: ChatTerminalActionsInput) {
     storeCloseTerminal(activeThreadRef, terminalId);
     focusActiveDrawerTerminal(activeThreadRef);
   };
+  const openScriptPreview = async (script: ProjectScript, threadRef: ScopedThreadRef) => {
+    if (!script.autoOpenPreview || !script.previewUrl) return;
+    if (!isPreviewAvailableFor(threadRef.environmentId)) return;
+    const previewResult = await openUrlInPreview({
+      threadRef,
+      url: resolveDiscoveredServerUrl(threadRef.environmentId, script.previewUrl),
+      openPreview,
+    });
+    if (previewResult._tag === "Failure" && !isAtomCommandInterrupted(previewResult)) {
+      const error = squashAtomCommandFailure(previewResult);
+      toastManager.add(
+        stackedThreadToast({
+          type: "error",
+          title: m(msg("Could not open preview")),
+          description: thrownErrorMessage(error, m) ?? m(msg("An unexpected error occurred.")),
+        }),
+      );
+    }
+  };
+  const showBackgroundScriptOutput = (
+    threadRef: ScopedThreadRef,
+    key: string,
+    terminalId: string,
+  ) => {
+    // A rerun already closed this shell.
+    if (readBackgroundScriptRun(key)?.terminalId !== terminalId) return;
+    setBackgroundScriptRun(key, null, terminalId);
+    storeEnsureTerminal(threadRef, terminalId, { open: true, active: true });
+    focusTerminal(threadRef, terminalId);
+  };
+  /** Clicking a running background script stops it; otherwise it starts a run out of sight. */
+  const runScriptInBackground = async (
+    script: ProjectScript,
+    threadRef: ScopedThreadRef,
+    location: { cwd: string; worktreePath: string | null },
+    env: Record<string, string> | undefined,
+  ) => {
+    const key = backgroundScriptRunKey(threadRef, script.id);
+    const current = readBackgroundScriptRun(key);
+    if (current?.status === "stopping") return;
+    if (current?.status === "running") {
+      setBackgroundScriptRun(key, { ...current, status: "stopping" }, current.terminalId);
+      terminalActions.closeTerminalSession(current.terminalId, threadRef);
+      return;
+    }
+    // A failed run keeps its shell for Show output until the next run replaces it.
+    if (current?.status === "failed") {
+      terminalActions.closeTerminalSession(current.terminalId, threadRef);
+    }
+    const launched = terminalActions.runInBackground({
+      command: script.command,
+      location,
+      stopOnSettle: script.stopOnSettle ?? false,
+      ...(env ? { extraEnv: env } : {}),
+    });
+    if (!launched) return;
+    const { terminalId } = launched;
+    setBackgroundScriptRun(key, { status: "running", terminalId });
+    void openScriptPreview(script, threadRef);
+    const result = await launched.result;
+    const run = readBackgroundScriptRun(key);
+    if (run?.terminalId !== terminalId) return;
+    if (run.status === "stopping" || isAtomCommandInterrupted(result)) {
+      setBackgroundScriptRun(key, null, terminalId);
+      return;
+    }
+    if (result._tag === "Success" && result.value.exitCode === 0) {
+      setBackgroundScriptRun(key, { status: "succeeded", terminalId }, terminalId);
+      setTimeout(() => setBackgroundScriptRun(key, null, terminalId), BACKGROUND_SCRIPT_SUCCESS_MS);
+      return;
+    }
+    setBackgroundScriptRun(key, { status: "failed", terminalId }, terminalId);
+    const exitCode = result._tag === "Success" ? result.value.exitCode : null;
+    toastManager.add(
+      stackedThreadToast({
+        type: "error",
+        title: m(msg('"{name}" failed', { name: script.name })),
+        description:
+          result._tag === "Failure"
+            ? (thrownErrorMessage(squashAtomCommandFailure(result), m) ??
+              m(msg("An unexpected error occurred.")))
+            : exitCode === null
+              ? m(msg("Its terminal closed before it finished."))
+              : m(msg("Exited with code {code}.", { code: exitCode })),
+        // A failed run leaves its shell open at the prompt; a closed one has nothing to show.
+        ...(exitCode === null
+          ? {}
+          : {
+              actionProps: {
+                children: m(msg("Show output")),
+                onClick: () => showBackgroundScriptOutput(threadRef, key, terminalId),
+              },
+            }),
+      }),
+    );
+  };
   const runProjectScript = async (
     script: ProjectScript,
     options?: {
@@ -223,6 +325,18 @@ export function useChatTerminalActions(input: ChatTerminalActionsInput) {
       });
     }
     const targetCwd = options?.cwd ?? gitCwd ?? activeProject.workspaceRoot;
+    if (script.runInBackground && activeThreadRef) {
+      await runScriptInBackground(
+        script,
+        activeThreadRef,
+        {
+          cwd: targetCwd,
+          worktreePath: options?.worktreePath ?? activeThread.worktreePath ?? null,
+        },
+        options?.env,
+      );
+      return;
+    }
     const reusableTerminalId =
       script.stopOnSettle ||
       options?.preferNewTerminal ||
@@ -299,27 +413,7 @@ export function useChatTerminalActions(input: ChatTerminalActionsInput) {
       }
       return;
     }
-    if (
-      script.autoOpenPreview &&
-      script.previewUrl &&
-      isPreviewAvailableFor(activeThreadRef.environmentId)
-    ) {
-      const previewResult = await openUrlInPreview({
-        threadRef: activeThreadRef,
-        url: resolveDiscoveredServerUrl(activeThreadRef.environmentId, script.previewUrl),
-        openPreview,
-      });
-      if (previewResult._tag === "Failure" && !isAtomCommandInterrupted(previewResult)) {
-        const error = squashAtomCommandFailure(previewResult);
-        toastManager.add(
-          stackedThreadToast({
-            type: "error",
-            title: m(msg("Could not open preview")),
-            description: thrownErrorMessage(error, m) ?? m(msg("An unexpected error occurred.")),
-          }),
-        );
-      }
-    }
+    await openScriptPreview(script, activeThreadRef);
   };
   const runProjectScriptStable = useStableCallback(runProjectScript);
 

@@ -182,7 +182,9 @@ project crumb.
 The Projects category, under Code, holds the project's name, icon, actions,
 checkouts and removal. Actions belong to a project: editing them creates the project's own list
 on each selected environment, and reset returns to the environment's shared list. A project's
-`t3.json` actions can be imported there. When a project has several checkouts on one environment,
+`t3.json` actions can be imported there. An action with **Run in the background without a terminal**
+on runs out of sight: its button shows a spinner while it runs (click it to stop), a check when it
+succeeds, and a cross when it fails, with **Show output** in the failure notice. When a project has several checkouts on one environment,
 choose one in the scope line at the top to see or change only that checkout's settings.
 
 Settings a repository can also declare in `t3.json`, such as the workspace for new threads,

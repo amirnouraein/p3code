@@ -239,6 +239,32 @@ export const TerminalCloseInput = Schema.Struct({
 });
 export type TerminalCloseInput = typeof TerminalCloseInput.Type;
 
+// Runs one command in a new terminal and resolves with its exit code once it finishes.
+export const TerminalRunCommandInput = Schema.Struct({
+  ...TerminalSessionInput.fields,
+  cwd: TrimmedNonEmptyStringSchema,
+  worktreePath: Schema.optional(Schema.NullOr(TrimmedNonEmptyStringSchema)),
+  env: Schema.optional(TerminalEnvSchema),
+  stopOnSettle: Schema.optional(Schema.Boolean),
+  command: TrimmedNonEmptyStringSchema,
+});
+export type TerminalRunCommandInput = typeof TerminalRunCommandInput.Type;
+
+export const TerminalRunCommandResult = Schema.Struct({
+  // Null when the terminal closed or exited before the command finished.
+  exitCode: Schema.NullOr(Schema.Int),
+});
+export type TerminalRunCommandResult = typeof TerminalRunCommandResult.Type;
+
+export class TerminalRunCommandError extends Schema.TaggedError<TerminalRunCommandError>()(
+  "TerminalRunCommandError",
+  { detail: Schema.String },
+) {
+  override get message() {
+    return this.detail;
+  }
+}
+
 export const TerminalSessionStatus = Schema.Literals(["starting", "running", "exited", "error"]);
 export type TerminalSessionStatus = typeof TerminalSessionStatus.Type;
 
