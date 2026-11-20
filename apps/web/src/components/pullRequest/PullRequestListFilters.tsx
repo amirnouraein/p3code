@@ -34,6 +34,7 @@ import { Button } from "../ui/button";
 import {
   Menu,
   MenuCheckboxItem,
+  MenuGroup,
   MenuGroupLabel,
   MenuItem,
   MenuPopup,
@@ -303,50 +304,52 @@ function PullRequestProjectFilter({
         </span>
       </MenuSubTrigger>
       <MenuSubPopup>
-        <MenuGroupLabel>{label}</MenuGroupLabel>
-        <MenuCheckboxItem checked={picked.length === 0} onCheckedChange={() => onChange([])}>
-          <span className="flex min-w-0 items-center gap-2">
-            <LayersIcon aria-hidden className="size-3.5" />
-            <span className="min-w-0 flex-1 truncate">{gt("All projects")}</span>
-          </span>
-        </MenuCheckboxItem>
-        {options.map((option) => {
-          const checked = picked.includes(option.value);
-          // A picked project that became unavailable can still be unpicked.
-          const disabled = option.unavailable !== undefined && !checked;
-          const item = (
-            <MenuCheckboxItem
-              key={option.value}
-              checked={checked}
-              className={disabled ? "data-disabled:pointer-events-auto" : undefined}
-              disabled={disabled}
-              onCheckedChange={(next) =>
-                onChange(
-                  next
-                    ? [...picked, option.value]
-                    : picked.filter((value) => value !== option.value),
-                )
-              }
-            >
-              <span className="flex min-w-0 items-center gap-2">
-                <PullRequestFilterOptionIcon option={option} />
-                <span className="min-w-0 flex-1 truncate">{option.label}</span>
-                {option.unavailable ? (
-                  <span className="shrink-0">
-                    · {gt("Unavailable", { $context: "filter option" })}
-                  </span>
-                ) : null}
-              </span>
-            </MenuCheckboxItem>
-          );
-          if (!option.unavailable) return item;
-          return (
-            <Tooltip key={option.value}>
-              <TooltipTrigger render={item} />
-              <TooltipPopup side="top">{option.unavailable}</TooltipPopup>
-            </Tooltip>
-          );
-        })}
+        <MenuGroup>
+          <MenuGroupLabel>{label}</MenuGroupLabel>
+          <MenuCheckboxItem checked={picked.length === 0} onCheckedChange={() => onChange([])}>
+            <span className="flex min-w-0 items-center gap-2">
+              <LayersIcon aria-hidden className="size-3.5" />
+              <span className="min-w-0 flex-1 truncate">{gt("All projects")}</span>
+            </span>
+          </MenuCheckboxItem>
+          {options.map((option) => {
+            const checked = picked.includes(option.value);
+            // A picked project that became unavailable can still be unpicked.
+            const disabled = option.unavailable !== undefined && !checked;
+            const item = (
+              <MenuCheckboxItem
+                key={option.value}
+                checked={checked}
+                className={disabled ? "data-disabled:pointer-events-auto" : undefined}
+                disabled={disabled}
+                onCheckedChange={(next) =>
+                  onChange(
+                    next
+                      ? [...picked, option.value]
+                      : picked.filter((value) => value !== option.value),
+                  )
+                }
+              >
+                <span className="flex min-w-0 items-center gap-2">
+                  <PullRequestFilterOptionIcon option={option} />
+                  <span className="min-w-0 flex-1 truncate">{option.label}</span>
+                  {option.unavailable ? (
+                    <span className="shrink-0">
+                      · {gt("Unavailable", { $context: "filter option" })}
+                    </span>
+                  ) : null}
+                </span>
+              </MenuCheckboxItem>
+            );
+            if (!option.unavailable) return item;
+            return (
+              <Tooltip key={option.value}>
+                <TooltipTrigger render={item} />
+                <TooltipPopup side="top">{option.unavailable}</TooltipPopup>
+              </Tooltip>
+            );
+          })}
+        </MenuGroup>
       </MenuSubPopup>
     </MenuSub>
   );
