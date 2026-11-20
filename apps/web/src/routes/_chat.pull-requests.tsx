@@ -8,7 +8,7 @@ import { PullRequestsPage } from "../components/pullRequest/PullRequestsPage";
 
 const MAX_SEARCH_LABEL_CANDIDATES = 100;
 
-function pullRequestSearchLabels(raw: unknown): PullRequestsSearch["labels"] {
+function pullRequestSearchValues(raw: unknown, limit: number): ReadonlyArray<string> | undefined {
   const values = (Array.isArray(raw) ? raw : typeof raw === "string" ? [raw] : []).slice(
     0,
     MAX_SEARCH_LABEL_CANDIDATES,
@@ -22,7 +22,7 @@ function pullRequestSearchLabels(raw: unknown): PullRequestsSearch["labels"] {
     if (value.length === 0 || seen.has(key)) continue;
     labels.push(value);
     seen.add(key);
-    if (labels.length === 10) break;
+    if (labels.length === limit) break;
   }
   return labels.length === 0 ? undefined : labels;
 }
@@ -46,6 +46,7 @@ export const Route = createFileRoute("/_chat/pull-requests")({
     ...(typeof raw.projectId === "string" && raw.projectId
       ? { projectId: raw.projectId as ProjectId }
       : {}),
+    projects: pullRequestSearchValues(raw.projects, 50),
     ...(typeof raw.environmentId === "string" && raw.environmentId
       ? { environmentId: raw.environmentId as EnvironmentId }
       : {}),
@@ -69,11 +70,9 @@ export const Route = createFileRoute("/_chat/pull-requests")({
       ? { review: raw.review }
       : {}),
     ...(raw.checks === "passing" || raw.checks === "failing" ? { checks: raw.checks } : {}),
-    author:
-      typeof raw.author === "string" && raw.author.trim()
-        ? raw.author.trim().slice(0, 200)
-        : undefined,
-    labels: pullRequestSearchLabels(raw.labels),
+    // `author` is the parameter links used before several authors could be picked.
+    authors: pullRequestSearchValues(raw.authors ?? raw.author, 10),
+    labels: pullRequestSearchValues(raw.labels, 10),
   }),
   component: PullRequestsPage,
 });

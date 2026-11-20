@@ -22,6 +22,7 @@ import * as Schema from "effect/Schema";
 import * as Semaphore from "effect/Semaphore";
 import * as Stream from "effect/Stream";
 import {
+  matchesPullRequestAuthorFilters,
   resolvePullRequestAuthorFilter,
   PositiveInt,
   TrimmedNonEmptyString,
@@ -923,9 +924,10 @@ function filterQualifiers(
       group.length === 0 ? [] : [`label:${group.map(qualifierValue).join(",")}`],
     ),
     ...(filters.excludedLabels ?? []).map((label) => `-label:${qualifierValue(label)}`),
-    ...(filters.author === undefined
-      ? []
-      : [`author:${qualifierValue(resolvePullRequestAuthorFilter(filters.author, viewer))}`]),
+    // Repeated author qualifiers mean OR to GitHub; a typed author narrows on its own.
+    ...(filters.author === undefined ? (filters.authors ?? []) : [filters.author]).map(
+      (author) => `author:${qualifierValue(resolvePullRequestAuthorFilter(author, viewer))}`,
+    ),
     ...(filters.draft === undefined ? [] : [`draft:${filters.draft === "only"}`]),
     ...(filters.review === undefined ? [] : [`review:${REVIEW_QUALIFIERS[filters.review]}`]),
     ...(filters.checks === undefined
@@ -951,9 +953,7 @@ function matchesFilters(
     (filters.checks === undefined || item.checksState === filters.checks) &&
     (filters.labels === undefined || filters.labels.every((group) => group.some(holds))) &&
     (filters.excludedLabels === undefined || !filters.excludedLabels.some(holds)) &&
-    (filters.author === undefined ||
-      item.author?.login.toLowerCase() ===
-        resolvePullRequestAuthorFilter(filters.author, viewer).toLowerCase())
+    matchesPullRequestAuthorFilters(item.author?.login, filters, viewer)
   );
 }
 

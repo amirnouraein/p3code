@@ -4,7 +4,9 @@ import { describe, expect, it } from "vite-plus/test";
 
 import {
   PullRequestDetail,
+  matchesPullRequestAuthorFilters,
   PullRequestListResult,
+  pullRequestNarrowingAuthor,
   resolvePullRequestAuthorFilter,
 } from "./pullRequest.ts";
 
@@ -145,5 +147,29 @@ describe("resolvePullRequestAuthorFilter", () => {
   it("passes any other login through trimmed", () => {
     expect(resolvePullRequestAuthorFilter(" ana ", "bilal")).toBe("ana");
     expect(resolvePullRequestAuthorFilter("meredith", "bilal")).toBe("meredith");
+  });
+});
+
+describe("matchesPullRequestAuthorFilters", () => {
+  it.each([
+    ["any picked author", "Octocat", { authors: ["me", "octocat"] }, true],
+    ["me as the viewer", "bilal", { authors: ["me", "octocat"] }, true],
+    ["no picked author", "ana", { authors: ["me", "octocat"] }, false],
+    [
+      "a typed author on top of the picked ones",
+      "octocat",
+      { author: "ana", authors: ["octocat"] },
+      false,
+    ],
+    ["no filter", "ana", {}, true],
+    ["a row without an author", null, { authors: ["ana"] }, false],
+  ])("matches %s", (_name, login, filters, expected) => {
+    expect(matchesPullRequestAuthorFilters(login, filters, "bilal")).toBe(expected);
+  });
+
+  it("narrows a host query to a typed author or a single picked one", () => {
+    expect(pullRequestNarrowingAuthor({ author: "ana", authors: ["a", "b"] })).toBe("ana");
+    expect(pullRequestNarrowingAuthor({ authors: ["octocat"] })).toBe("octocat");
+    expect(pullRequestNarrowingAuthor({ authors: ["a", "b"] })).toBeUndefined();
   });
 });

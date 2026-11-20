@@ -140,7 +140,6 @@ export function PullRequestSearchInput({
   );
 }
 
-const ALL_PROJECTS_VALUE = "all";
 const ALL_HOSTS_VALUE = "";
 const ALL_SERVERS_VALUE = "";
 const UNFILTERED_VALUE = "all";
@@ -272,6 +271,87 @@ export function PullRequestFilterRadioSubmenu<Value extends string>({
   );
 }
 
+function PullRequestProjectFilter({
+  picked,
+  options,
+  onChange,
+}: {
+  picked: ReadonlyArray<string>;
+  options: ReadonlyArray<PullRequestFilterOption<string>>;
+  onChange: (projects: ReadonlyArray<string>) => void;
+}) {
+  const gt = useGT();
+  const label = gt("Project", { $context: "pull request filter" });
+  const chosen = options.filter((option) => picked.includes(option.value));
+  const only = chosen.length === 1 ? chosen[0] : undefined;
+  return (
+    <MenuSub>
+      <MenuSubTrigger>
+        {only ? (
+          <PullRequestFilterOptionIcon option={only} />
+        ) : (
+          <LayersIcon aria-hidden className="size-3.5" />
+        )}
+        <span className="flex-1">{label}</span>
+        <span className="min-w-0 max-w-32 truncate text-xs text-muted-foreground">
+          {picked.length === 0
+            ? gt("All projects")
+            : (only?.label ??
+              gt("{count, plural, one {{count} selected} other {{count} selected}}", {
+                count: picked.length,
+              }))}
+        </span>
+      </MenuSubTrigger>
+      <MenuSubPopup>
+        <MenuGroupLabel>{label}</MenuGroupLabel>
+        <MenuCheckboxItem checked={picked.length === 0} onCheckedChange={() => onChange([])}>
+          <span className="flex min-w-0 items-center gap-2">
+            <LayersIcon aria-hidden className="size-3.5" />
+            <span className="min-w-0 flex-1 truncate">{gt("All projects")}</span>
+          </span>
+        </MenuCheckboxItem>
+        {options.map((option) => {
+          const checked = picked.includes(option.value);
+          // A picked project that became unavailable can still be unpicked.
+          const disabled = option.unavailable !== undefined && !checked;
+          const item = (
+            <MenuCheckboxItem
+              key={option.value}
+              checked={checked}
+              className={disabled ? "data-disabled:pointer-events-auto" : undefined}
+              disabled={disabled}
+              onCheckedChange={(next) =>
+                onChange(
+                  next
+                    ? [...picked, option.value]
+                    : picked.filter((value) => value !== option.value),
+                )
+              }
+            >
+              <span className="flex min-w-0 items-center gap-2">
+                <PullRequestFilterOptionIcon option={option} />
+                <span className="min-w-0 flex-1 truncate">{option.label}</span>
+                {option.unavailable ? (
+                  <span className="shrink-0">
+                    · {gt("Unavailable", { $context: "filter option" })}
+                  </span>
+                ) : null}
+              </span>
+            </MenuCheckboxItem>
+          );
+          if (!option.unavailable) return item;
+          return (
+            <Tooltip key={option.value}>
+              <TooltipTrigger render={item} />
+              <TooltipPopup side="top">{option.unavailable}</TooltipPopup>
+            </Tooltip>
+          );
+        })}
+      </MenuSubPopup>
+    </MenuSub>
+  );
+}
+
 /** The listing's own scope, which the pickers search the host within. */
 export type PullRequestFilterOptionScope = EnvironmentQueryTarget<
   Omit<PullRequestFilterOptionsInput, "kind" | "query">
@@ -302,23 +382,22 @@ function PullRequestAuthorChoices({
   scope,
   onChange,
 }: {
-  value: string | undefined;
+  value: ReadonlyArray<string>;
   options: ReadonlyArray<PullRequestAuthorFacet>;
   scope: ReadonlyArray<PullRequestFilterOptionScope>;
-  onChange: (author: string | undefined) => void;
+  onChange: (authors: ReadonlyArray<string>) => void;
 }) {
   const gt = useGT();
   const [query, setQuery] = useState("");
   const hosted = useHostedFilterOptions(scope, "authors", query);
-  const login = value?.toLowerCase() ?? "";
-  const selected = selectedPullRequestAuthor(options, hosted.authors, value);
+  const logins = new Set(value.map((login) => login.toLowerCase()));
+  // Chosen authors lead, so one the current search misses can still be seen and cleared.
   const visible = [
-    ...(selected ? [selected] : []),
+    ...value.flatMap((login) => selectedPullRequestAuthor(options, hosted.authors, login) ?? []),
     ...pullRequestAuthorChoices(options, hosted.authors, query).filter(
-      (option) => option.actor.login.toLowerCase() !== login,
+      (option) => !logins.has(option.actor.login.toLowerCase()),
     ),
   ].slice(0, 30);
-  const select = (next: string) => next.toLowerCase() !== login && onChange(next || undefined);
   return (
     <>
       <MenuSearchInput
@@ -329,15 +408,26 @@ function PullRequestAuthorChoices({
         placeholder={gt("Search authors")}
         aria-label={gt("Search authors")}
       />
-      <MenuRadioGroup value={selected?.actor.login ?? value ?? ""} onValueChange={select}>
-        <MenuRadioItem value="">
-          <span className="flex min-w-0 items-center gap-2">
-            <LayersIcon aria-hidden className="size-3.5" />
-            <T>Anyone</T>
-          </span>
-        </MenuRadioItem>
-        {visible.map((option) => (
-          <MenuRadioItem key={option.actor.login.toLowerCase()} value={option.actor.login}>
+      <MenuCheckboxItem checked={value.length === 0} onCheckedChange={() => onChange([])}>
+        <span className="flex min-w-0 items-center gap-2">
+          <LayersIcon aria-hidden className="size-3.5" />
+          <T>Anyone</T>
+        </span>
+      </MenuCheckboxItem>
+      {visible.map((option) => {
+        const login = option.actor.login.toLowerCase();
+        return (
+          <MenuCheckboxItem
+            key={login}
+            checked={logins.has(login)}
+            onCheckedChange={(next) =>
+              onChange(
+                next
+                  ? [...value, option.actor.login].slice(0, 10)
+                  : value.filter((author) => author.toLowerCase() !== login),
+              )
+            }
+          >
             <span className="flex min-w-0 items-center gap-2">
               <PullRequestActorAvatar actor={option.actor} />
               <span className="min-w-0 flex-1 truncate">{option.actor.login}</span>
@@ -347,16 +437,16 @@ function PullRequestAuthorChoices({
                 </span>
               ) : null}
             </span>
-          </MenuRadioItem>
-        ))}
-        {visible.length === 0 && !hosted.isPending ? (
-          <MenuItem disabled>
-            {hosted.error === null
-              ? gt("No authors found")
-              : gt("Couldn't search authors on the host")}
-          </MenuItem>
-        ) : null}
-      </MenuRadioGroup>
+          </MenuCheckboxItem>
+        );
+      })}
+      {visible.length === 0 && !hosted.isPending ? (
+        <MenuItem disabled>
+          {hosted.error === null
+            ? gt("No authors found")
+            : gt("Couldn't search authors on the host")}
+        </MenuItem>
+      ) : null}
     </>
   );
 }
@@ -367,10 +457,10 @@ function PullRequestAuthorFilter({
   scope,
   onChange,
 }: {
-  value: string | undefined;
+  value: ReadonlyArray<string>;
   options: ReadonlyArray<PullRequestAuthorFacet>;
   scope: ReadonlyArray<PullRequestFilterOptionScope>;
-  onChange: (author: string | undefined) => void;
+  onChange: (authors: ReadonlyArray<string>) => void;
 }) {
   const gt = useGT();
   return (
@@ -381,7 +471,13 @@ function PullRequestAuthorFilter({
           <T>Author</T>
         </span>
         <span className="min-w-0 max-w-32 truncate text-xs text-muted-foreground">
-          {value ?? gt("Anyone")}
+          {value.length === 0
+            ? gt("Anyone")
+            : value.length === 1
+              ? value[0]
+              : gt("{count, plural, one {{count} selected} other {{count} selected}}", {
+                  count: value.length,
+                })}
         </span>
       </MenuSubTrigger>
       <MenuSubPopup>
@@ -527,10 +623,9 @@ export function PullRequestFiltersMenu({
   serverOptions,
   onServer,
   projects,
-  projectId,
-  projectEnvironmentId,
+  pickedProjects,
   unavailable,
-  onProject,
+  onProjects,
 }: {
   onOpenChange?: (open: boolean) => void;
   state: PullRequestListState;
@@ -551,10 +646,10 @@ export function PullRequestFiltersMenu({
   serverOptions: ReadonlyArray<PullRequestFilterOption<string>>;
   onServer: (server: EnvironmentId | undefined) => void;
   projects: ReadonlyArray<ProjectFaviconProject & { readonly id: ProjectId }>;
-  projectId: ProjectId | undefined;
-  projectEnvironmentId: EnvironmentId | undefined;
+  /** `pullRequestProjectKey`s. */
+  pickedProjects: ReadonlyArray<string>;
   unavailable: ReadonlyMap<string, string>;
-  onProject: (projectId: ProjectId | undefined, environmentId: EnvironmentId | undefined) => void;
+  onProjects: (projects: ReadonlyArray<string>) => void;
 }) {
   const gt = useGT();
   const resolve = useMessages();
@@ -564,11 +659,11 @@ export function PullRequestFiltersMenu({
     involvement !== "all",
     host,
     server,
-    projectId,
+    pickedProjects.length > 0,
     filters.draft,
     filters.review,
     filters.checks,
-    filters.author,
+    ...(filters.authors ?? []),
     ...selectedLabels,
   ].filter(Boolean).length;
   const updateFilters = (next: Partial<PullRequestListFilters>) =>
@@ -581,28 +676,21 @@ export function PullRequestFiltersMenu({
     updateFilters({
       [key]: value === UNFILTERED_VALUE ? undefined : value,
     } as Partial<PullRequestListFilters>);
-  const projectValue =
-    projectId === undefined || projectEnvironmentId === undefined
-      ? ALL_PROJECTS_VALUE
-      : pullRequestProjectKey({ id: projectId, environmentId: projectEnvironmentId });
-  const projectOptions: ReadonlyArray<PullRequestFilterOption<string>> = [
-    { value: ALL_PROJECTS_VALUE, label: gt("All projects"), Icon: LayersIcon },
-    ...projects
-      .toSorted(
-        (left, right) =>
-          Number(unavailable.has(pullRequestProjectKey(left))) -
-          Number(unavailable.has(pullRequestProjectKey(right))),
-      )
-      .map((project) => ({
-        value: pullRequestProjectKey(project),
-        label: project.title,
-        Icon: FolderGit2Icon,
-        project,
-        ...(unavailable.has(pullRequestProjectKey(project))
-          ? { unavailable: unavailable.get(pullRequestProjectKey(project)) }
-          : {}),
-      })),
-  ];
+  const projectOptions: ReadonlyArray<PullRequestFilterOption<string>> = projects
+    .toSorted(
+      (left, right) =>
+        Number(unavailable.has(pullRequestProjectKey(left))) -
+        Number(unavailable.has(pullRequestProjectKey(right))),
+    )
+    .map((project) => ({
+      value: pullRequestProjectKey(project),
+      label: project.title,
+      Icon: FolderGit2Icon,
+      project,
+      ...(unavailable.has(pullRequestProjectKey(project))
+        ? { unavailable: unavailable.get(pullRequestProjectKey(project)) }
+        : {}),
+    }));
   return (
     <Menu onOpenChange={onOpenChange}>
       <MenuTrigger render={<Button variant="outline" />}>
@@ -631,10 +719,12 @@ export function PullRequestFiltersMenu({
         />
         <MenuSeparator />
         <PullRequestAuthorFilter
-          value={filters.author}
+          value={filters.authors ?? []}
           options={authorOptions}
           scope={optionScope}
-          onChange={(author) => updateFilters({ author })}
+          onChange={(authors) =>
+            updateFilters({ authors: authors.length > 0 ? authors : undefined })
+          }
         />
         <PullRequestLabelFilter
           value={selectedLabels}
@@ -689,15 +779,10 @@ export function PullRequestFiltersMenu({
           </>
         ) : null}
         <MenuSeparator />
-        <PullRequestFilterRadioSubmenu
-          label={gt("Project", { $context: "pull request filter" })}
-          value={projectValue}
+        <PullRequestProjectFilter
+          picked={pickedProjects}
           options={projectOptions}
-          onChange={(next) => {
-            const project = projects.find((candidate) => pullRequestProjectKey(candidate) === next);
-            if (project) onProject(project.id, project.environmentId);
-            else if (projectId !== undefined) onProject(undefined, undefined);
-          }}
+          onChange={onProjects}
         />
       </MenuPopup>
     </Menu>

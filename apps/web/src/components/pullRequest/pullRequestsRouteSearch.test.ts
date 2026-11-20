@@ -38,7 +38,7 @@ describe("pull requests route search", () => {
   });
 
   it("drops an author or labels the URL parser turned into a number", () => {
-    expect(matchedSearch("/pull-requests?author=4089")?.author).toBeUndefined();
+    expect(matchedSearch("/pull-requests?author=4089")?.authors).toBeUndefined();
     expect(matchedSearch("/pull-requests?labels=4089")?.labels).toBeUndefined();
   });
 });

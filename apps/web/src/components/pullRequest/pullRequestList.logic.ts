@@ -1,7 +1,7 @@
 import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
 import { msg } from "gt-react";
 
-import { resolvePullRequestAuthorFilter } from "@t3tools/contracts";
+import { matchesPullRequestAuthorFilters } from "@t3tools/contracts";
 import type {
   EnvironmentId,
   PullRequestListEntry,
@@ -269,9 +269,7 @@ export function matchesPullRequestFilters(
         : entry.reviewDecision === filters.review)) &&
     (filters.labels === undefined || filters.labels.every((group) => group.some(holds))) &&
     (filters.excludedLabels === undefined || !filters.excludedLabels.some(holds)) &&
-    (filters.author === undefined ||
-      entry.author?.login.toLowerCase() ===
-        resolvePullRequestAuthorFilter(filters.author, viewer).toLowerCase())
+    matchesPullRequestAuthorFilters(entry.author?.login, filters, viewer)
   );
 }
 

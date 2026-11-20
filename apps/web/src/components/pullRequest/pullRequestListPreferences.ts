@@ -24,12 +24,14 @@ export interface PullRequestListPreferences {
   readonly state: PullRequestListState;
   readonly environmentId?: EnvironmentId;
   readonly projectId?: ProjectId;
+  /** Picked projects, as `pullRequestProjectKey`s; `projectId` is a project a link named. */
+  readonly projects?: ReadonlyArray<string> | undefined;
   readonly host?: string | undefined;
   readonly q?: string | undefined;
   readonly draft?: "only" | "hide";
   readonly review?: NonNullable<PullRequestListFilters["review"]>;
   readonly checks?: NonNullable<PullRequestListFilters["checks"]>;
-  readonly author?: string | undefined;
+  readonly authors?: ReadonlyArray<string> | undefined;
   readonly labels?: ReadonlyArray<string> | undefined;
   readonly sort?: PullRequestListSort;
 }
@@ -49,12 +51,15 @@ export const PullRequestListPreferencesSchema = Schema.Struct({
   state: PullRequestListState,
   environmentId: Schema.optional(EnvironmentId),
   projectId: Schema.optional(ProjectId),
+  projects: Schema.optional(Schema.Array(BoundedPreference).check(Schema.isMaxLength(50))),
   host: Schema.optional(BoundedPreference),
   q: Schema.optional(BoundedPreference),
   draft: PullRequestListFilters.fields.draft,
   review: PullRequestListFilters.fields.review,
   checks: PullRequestListFilters.fields.checks,
+  /** Saved before several authors could be picked. */
   author: Schema.optional(BoundedPreference),
+  authors: Schema.optional(Schema.Array(BoundedPreference).check(Schema.isMaxLength(10))),
   labels: Schema.optional(Schema.Array(BoundedPreference).check(Schema.isMaxLength(10))),
   sort: Schema.optional(PullRequestListSort),
 });
@@ -74,17 +79,19 @@ function resolvePreferenceStorage(
 export function pullRequestListPreferences(
   search: PullRequestListPreferences | Schema.Schema.Type<typeof PullRequestListPreferencesSchema>,
 ): PullRequestListPreferences {
+  const authors = search.authors ?? ("author" in search && search.author ? [search.author] : []);
   return {
     involvement: search.involvement,
     state: search.state,
     ...(search.environmentId ? { environmentId: search.environmentId } : {}),
     ...(search.projectId ? { projectId: search.projectId } : {}),
+    ...(search.projects && search.projects.length > 0 ? { projects: search.projects } : {}),
     ...(search.host ? { host: search.host } : {}),
     ...(search.q ? { q: search.q } : {}),
     ...(search.draft ? { draft: search.draft } : {}),
     ...(search.review ? { review: search.review } : {}),
     ...(search.checks ? { checks: search.checks } : {}),
-    ...(search.author ? { author: search.author } : {}),
+    ...(authors.length > 0 ? { authors } : {}),
     ...(search.labels && search.labels.length > 0 ? { labels: search.labels } : {}),
     ...(search.sort && search.sort !== "ready" ? { sort: search.sort } : {}),
   };

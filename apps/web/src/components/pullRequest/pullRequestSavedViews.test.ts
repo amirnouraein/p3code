@@ -18,7 +18,7 @@ const preferences = {
   draft: "hide",
   review: "review-required",
   checks: "passing",
-  author: "me",
+  authors: ["me", "octocat"],
   labels: ["bug", "priority"],
   sort: "updated",
 } as const satisfies PullRequestListPreferences;
@@ -56,6 +56,11 @@ describe("saved PR views", () => {
         ...pullRequestSavedViewPatch(preferences),
       }),
     ).toEqual(preferences);
+    // A view saved when only one author could be picked.
+    expect(pullRequestListPreferences({ ...previous, author: "me" })).toEqual({
+      ...previous,
+      authors: ["me"],
+    });
     expect(
       pullRequestViewMatches(view, {
         ...preferences,
@@ -70,6 +75,7 @@ describe("saved PR views", () => {
       pullRequestViewMatches(defaultView, {
         ...preferences,
         labels: ["priority", "bug"],
+        authors: ["octocat", "me"],
         sort: "ready",
       }),
     ).toBe(true);

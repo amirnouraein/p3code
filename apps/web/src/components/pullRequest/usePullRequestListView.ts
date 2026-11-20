@@ -34,9 +34,10 @@ import {
   type PullRequestGroup,
   type PullRequestListOverride,
 } from "./pullRequestList.logic";
-import type { PullRequestExpectedHost } from "./PullRequestListFilters";
+import { pullRequestProjectKey, type PullRequestExpectedHost } from "./PullRequestListFilters";
 import type { PullRequestListPreferences, PullRequestListSort } from "./pullRequestListPreferences";
 import {
+  pullRequestPickedProjectQueries,
   pullRequestProjectQueries,
   type PullRequestHostAvailability,
 } from "./pullRequestProjectAssignment.logic";
@@ -56,6 +57,20 @@ export interface PullRequestsSearch extends PullRequestListPreferences {
 }
 
 const SEARCH_DEBOUNCE_MS = 250;
+
+/** Reads a `pullRequestProjectKey` back; the URL can hold anything. */
+function parseProjectKey(key: string | undefined): [EnvironmentId?, ProjectId?] {
+  try {
+    const parsed: unknown = JSON.parse(key ?? "");
+    return Array.isArray(parsed) &&
+      parsed.length === 2 &&
+      parsed.every((part) => typeof part === "string" && part.length > 0)
+      ? [parsed[0] as EnvironmentId, parsed[1] as ProjectId]
+      : [];
+  } catch {
+    return [];
+  }
+}
 const UNREACHABLE_PHASES: ReadonlySet<EnvironmentConnectionPhase> = new Set([
   "offline",
   "reconnecting",
@@ -93,9 +108,26 @@ export function usePullRequestScope(
   const environmentLabels = new Map(
     environments.map((environment) => [environment.environmentId, environment.label] as const),
   );
-  const scopedProjectId = resolveProjectScope(search.projectId, projects, projectsKnown);
-  const scopedProject = findScopedProject(projects, scopedEnvironmentId, scopedProjectId);
+  const pickedKeys = search.projectId === undefined ? (search.projects ?? []) : [];
+  // One picked project reads exactly like a linked `projectId`, on the server it was picked from.
+  const [onlyPickedEnvironmentId, onlyPickedId] =
+    pickedKeys.length === 1 ? parseProjectKey(pickedKeys[0]) : [];
+  const scopedProjectId = resolveProjectScope(
+    search.projectId ?? onlyPickedId,
+    projects,
+    projectsKnown,
+  );
+  const scopedProject = findScopedProject(
+    projects,
+    onlyPickedEnvironmentId ?? scopedEnvironmentId,
+    scopedProjectId,
+  );
   const scopedProjects = pullRequestFilterProjects(projects, environmentLabels, scopedProject);
+  const pickedProjects = projects.filter((project) =>
+    pickedKeys.includes(pullRequestProjectKey(project)),
+  );
+  // Several picked projects narrow the read; stale keys that match nothing read everything.
+  const picked = pickedKeys.length > 1 && pickedProjects.length > 0 ? pickedProjects : null;
 
   const selectedHost = search.selectedHost ?? search.host;
   // A named server still connecting is kept named rather than falling back: falling back while it
@@ -121,13 +153,18 @@ export function usePullRequestScope(
     linkedProjectId === undefined && search.repository !== undefined
       ? projectForRepository
       : findScopedProject(projects, selectedEnvironmentId, linkedProjectId ?? scopedProjectId);
-  const queryEnvironmentIds = resolveQueryEnvironmentIds(
-    environmentIds,
-    projects,
-    scopedProject,
-    scopedProjectId,
-    projectsKnown,
-  );
+  const queryEnvironmentIds =
+    picked === null
+      ? resolveQueryEnvironmentIds(
+          environmentIds,
+          projects,
+          scopedProject,
+          scopedProjectId,
+          projectsKnown,
+        )
+      : environmentIds.filter((environmentId) =>
+          picked.some((project) => project.environmentId === environmentId),
+        );
   const unreachable = new Set(
     environments.flatMap((environment) =>
       UNREACHABLE_PHASES.has(environment.connection.phase) ? [environment.environmentId] : [],
@@ -141,6 +178,7 @@ export function usePullRequestScope(
   }> => {
     const plain = queryEnvironmentIds.map((environmentId) => ({ environmentId }));
     if (!projectsKnown || scopedProjectId !== undefined) return plain;
+    if (picked !== null) return pullRequestPickedProjectQueries(picked);
     return pullRequestProjectQueries(projects, queryEnvironmentIds, availability, unreachable);
   };
   const environmentQueries = queriesFor(hostAvailability);
@@ -217,7 +255,7 @@ export function usePullRequestQueryFilters(search: PullRequestsSearch, typedQuer
     ...(search.draft ? { draft: search.draft } : {}),
     ...(search.review ? { review: search.review } : {}),
     ...(search.checks ? { checks: search.checks } : {}),
-    ...(search.author ? { author: search.author } : {}),
+    ...(search.authors ? { authors: search.authors } : {}),
     ...(search.labels ? { labels: search.labels.map((label) => [label]) } : {}),
   };
   const menuFiltered = Object.keys(menuFilters).length > 0;

@@ -199,16 +199,37 @@ export function pullRequestProjectQueries(
     const projectIds = assignment.get(environmentId);
     if (projectIds === undefined) return [];
     if (projectIds.length === totals.get(environmentId)) return [{ environmentId }];
-    const queries: Array<{ environmentId: EnvironmentId; projectIds: ReadonlyArray<ProjectId> }> =
-      [];
-    for (let offset = 0; offset < projectIds.length; offset += PULL_REQUEST_LIST_PROJECT_LIMIT) {
-      queries.push({
-        environmentId,
-        projectIds: projectIds.slice(offset, offset + PULL_REQUEST_LIST_PROJECT_LIMIT),
-      });
-    }
-    return queries;
+    return projectQueryChunks(environmentId, projectIds);
   });
+}
+
+function projectQueryChunks(environmentId: EnvironmentId, projectIds: ReadonlyArray<ProjectId>) {
+  const queries: Array<{ environmentId: EnvironmentId; projectIds: ReadonlyArray<ProjectId> }> = [];
+  for (let offset = 0; offset < projectIds.length; offset += PULL_REQUEST_LIST_PROJECT_LIMIT) {
+    queries.push({
+      environmentId,
+      projectIds: projectIds.slice(offset, offset + PULL_REQUEST_LIST_PROJECT_LIMIT),
+    });
+  }
+  return queries;
+}
+
+/** Reads exactly the projects a reader picked, each on the server it was picked from. */
+export function pullRequestPickedProjectQueries(
+  projects: ReadonlyArray<{ readonly id: ProjectId; readonly environmentId: EnvironmentId }>,
+): ReadonlyArray<{
+  readonly environmentId: EnvironmentId;
+  readonly projectIds: ReadonlyArray<ProjectId>;
+}> {
+  const byEnvironment = new Map<EnvironmentId, ProjectId[]>();
+  for (const project of projects) {
+    const listed = byEnvironment.get(project.environmentId);
+    if (listed === undefined) byEnvironment.set(project.environmentId, [project.id]);
+    else listed.push(project.id);
+  }
+  return [...byEnvironment].flatMap(([environmentId, projectIds]) =>
+    projectQueryChunks(environmentId, projectIds),
+  );
 }
 
 export interface PickableEnvironment {

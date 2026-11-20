@@ -18,7 +18,8 @@ import * as SubscriptionRef from "effect/SubscriptionRef";
 import {
   PullRequestOperationError,
   PullRequestUnavailableError,
-  resolvePullRequestAuthorFilter,
+  matchesPullRequestAuthorFilters,
+  pullRequestNarrowingAuthor,
   type OrchestrationProjectShell,
   type ProjectId,
   type PullRequestAction,
@@ -1304,6 +1305,14 @@ export const make = Effect.gen(function* () {
       { concurrency: REPOSITORY_CONCURRENCY },
     );
 
+  // Most hosts narrow their own query to a single author; rows are checked against all of them.
+  const hostFilters = (
+    filters: PullRequestListFilters | undefined,
+  ): PullRequestListFilters | undefined => {
+    const author = filters === undefined ? undefined : pullRequestNarrowingAuthor(filters);
+    return author === undefined || filters === undefined ? filters : { ...filters, author };
+  };
+
   const matchesRowFilters = (
     item: ProviderChangeRequest,
     filters: PullRequestListFilters | undefined,
@@ -1324,9 +1333,7 @@ export const make = Effect.gen(function* () {
         item.checksState === filters.checks) &&
       (filters.labels === undefined || filters.labels.every((group) => group.some(holds))) &&
       (filters.excludedLabels === undefined || !filters.excludedLabels.some(holds)) &&
-      (filters.author === undefined ||
-        item.author?.login.toLowerCase() ===
-          resolvePullRequestAuthorFilter(filters.author, viewer).toLowerCase())
+      matchesPullRequestAuthorFilters(item.author?.login, filters, viewer)
     );
   };
 
@@ -1482,7 +1489,7 @@ export const make = Effect.gen(function* () {
             viewer,
             limit,
             query: input.query,
-            filters: input.filters,
+            filters: hostFilters(input.filters),
             ...(cursor === undefined
               ? {}
               : {
@@ -1594,7 +1601,7 @@ export const make = Effect.gen(function* () {
         viewer,
         limit,
         query: input.query,
-        filters: input.filters,
+        filters: hostFilters(input.filters),
         ...(cursor === undefined
           ? {}
           : {
@@ -3130,7 +3137,7 @@ export const make = Effect.gen(function* () {
       string | ReadonlyArray<string> | ReadonlyArray<ReadonlyArray<string>> | null
     >,
   ): PullRequestListFilters => {
-    const [draft, review, checks, author, labels, excludedLabels] = slots;
+    const [draft, review, checks, author, labels, excludedLabels, authors] = slots;
     return {
       ...(typeof draft === "string" ? { draft: draft as "only" | "hide" } : {}),
       ...(typeof review === "string" ? { review: review as PullRequestListFilters["review"] } : {}),
@@ -3138,6 +3145,7 @@ export const make = Effect.gen(function* () {
       ...(typeof author === "string" ? { author } : {}),
       ...(Array.isArray(labels) ? { labels: labels as ReadonlyArray<ReadonlyArray<string>> } : {}),
       ...(Array.isArray(excludedLabels) ? { excludedLabels } : {}),
+      ...(Array.isArray(authors) ? { authors: authors as ReadonlyArray<string> } : {}),
     };
   };
 
@@ -3281,6 +3289,7 @@ export const make = Effect.gen(function* () {
             input.filters.author ?? null,
             input.filters.labels ?? null,
             input.filters.excludedLabels ?? null,
+            input.filters.authors ?? null,
           ],
       input.projectId ?? null,
       input.projectIds === undefined ? null : [...input.projectIds].sort(),

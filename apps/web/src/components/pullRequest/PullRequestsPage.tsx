@@ -276,6 +276,7 @@ export function PullRequestsPage() {
           ...(next.repository ? { repository: next.repository } : {}),
           ...(next.number ? { number: next.number } : {}),
           ...(next.projectId ? { projectId: next.projectId } : {}),
+          ...(next.projects && next.projects.length > 0 ? { projects: next.projects } : {}),
           ...(next.environmentId ? { environmentId: next.environmentId } : {}),
           ...(next.host ? { host: next.host } : {}),
           ...(next.selectedHost ? { selectedHost: next.selectedHost } : {}),
@@ -287,7 +288,7 @@ export function PullRequestsPage() {
           ...(next.draft ? { draft: next.draft } : {}),
           ...(next.review ? { review: next.review } : {}),
           ...(next.checks ? { checks: next.checks } : {}),
-          ...(next.author ? { author: next.author } : {}),
+          ...(next.authors && next.authors.length > 0 ? { authors: next.authors } : {}),
           ...(next.labels && next.labels.length > 0 ? { labels: next.labels } : {}),
         };
       },
@@ -333,7 +334,7 @@ export function PullRequestsPage() {
   const turnRefreshToken = turnRefreshes
     .map(([environmentId, revision]) => `${environmentId}:${revision}`)
     .join("|");
-  const scopeKey = `${environmentKey}:${assignmentKey}:${search.state}:${search.involvement}:${scopedProjectId ?? ""}:${search.host ?? ""}:${search.draft ?? ""}:${search.review ?? ""}:${search.checks ?? ""}:${search.author ?? ""}:${search.labels?.join("\u0000") ?? ""}`;
+  const scopeKey = `${environmentKey}:${assignmentKey}:${search.state}:${search.involvement}:${scopedProjectId ?? ""}:${search.projects?.join("\u0000") ?? ""}:${search.host ?? ""}:${search.draft ?? ""}:${search.review ?? ""}:${search.checks ?? ""}:${search.authors?.join("\u0000") ?? ""}:${search.labels?.join("\u0000") ?? ""}`;
   const filterKey = `${scopeKey}:${sentQuery}`;
   const statsScope: PullRequestStatsScope = { key: filterKey, policy: statsPolicy };
   const [page, setPage] = useState<{
@@ -1402,7 +1403,7 @@ export function PullRequestsPage() {
           draft: next.draft,
           review: next.review,
           checks: next.checks,
-          author: next.author,
+          authors: next.authors,
           labels: next.labels?.flatMap((group) => group),
         });
       }}
@@ -1414,13 +1415,19 @@ export function PullRequestsPage() {
       onHost={(host) => updateListScope({ host })}
       server={scopedEnvironmentId ?? undefined}
       serverOptions={serverMenuOptions}
-      onServer={(server) => updateListScope({ environmentId: server, projectId: undefined })}
+      onServer={(server) =>
+        updateListScope({ environmentId: server, projectId: undefined, projects: undefined })
+      }
       projects={scopedProjects}
-      projectId={scopedProjectId}
-      projectEnvironmentId={scopedProject?.environmentId}
+      pickedProjects={
+        search.projects ?? (scopedProject ? [pullRequestProjectKey(scopedProject)] : [])
+      }
       unavailable={unavailableProjects}
-      onProject={(projectId, environmentId) =>
-        updateListScope(environmentId === undefined ? { projectId } : { projectId, environmentId })
+      onProjects={(projects) =>
+        updateListScope({
+          projectId: undefined,
+          projects: projects.length === 0 ? undefined : projects,
+        })
       }
     />
   );

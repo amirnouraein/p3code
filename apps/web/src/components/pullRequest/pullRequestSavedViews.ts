@@ -19,6 +19,8 @@ export function pullRequestViewMatches(
     return JSON.stringify({
       ...normalized,
       labels: normalized.labels?.toSorted(),
+      authors: normalized.authors?.toSorted(),
+      projects: normalized.projects?.toSorted(),
     });
   };
   return key(pullRequestListPreferences(view.preferences)) === key(preferences);
@@ -51,12 +53,13 @@ export function pullRequestSavedViewPatch(
     state: preferences.state,
     environmentId: preferences.environmentId,
     projectId: preferences.projectId,
+    projects: preferences.projects,
     host: preferences.host,
     q: preferences.q,
     draft: preferences.draft,
     review: preferences.review,
     checks: preferences.checks,
-    author: preferences.author,
+    authors: preferences.authors,
     labels: preferences.labels,
     sort: preferences.sort,
   };

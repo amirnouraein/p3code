@@ -45,6 +45,8 @@ export const PullRequestListFilters = Schema.Struct({
   labels: Schema.optional(Schema.Array(PullRequestQualifierValues).check(Schema.isMaxLength(10))),
   excludedLabels: Schema.optional(PullRequestQualifierValues),
   author: Schema.optional(PullRequestQualifierValue),
+  /** Any one of these authors suffices; `author`, from a typed query, must still hold too. */
+  authors: Schema.optional(PullRequestQualifierValues),
 });
 export type PullRequestListFilters = typeof PullRequestListFilters.Type;
 
@@ -997,6 +999,26 @@ export function resolvePullRequestAuthorFilter(
   const trimmed = author.trim();
   if (!/^@?me$/i.test(trimmed)) return trimmed;
   return viewer === null || viewer === undefined || viewer.trim().length === 0 ? trimmed : viewer;
+}
+
+type PullRequestAuthorFilters = Pick<PullRequestListFilters, "author" | "authors">;
+
+export function matchesPullRequestAuthorFilters(
+  login: string | null | undefined,
+  filters: PullRequestAuthorFilters,
+  viewer: string | null | undefined,
+): boolean {
+  const is = (author: string) =>
+    login?.toLowerCase() === resolvePullRequestAuthorFilter(author, viewer).toLowerCase();
+  return (
+    (filters.author === undefined || is(filters.author)) &&
+    (filters.authors === undefined || filters.authors.length === 0 || filters.authors.some(is))
+  );
+}
+
+/** The one author a host's own query can narrow to, which most hosts accept only one of. */
+export function pullRequestNarrowingAuthor(filters: PullRequestAuthorFilters): string | undefined {
+  return filters.author ?? (filters.authors?.length === 1 ? filters.authors[0] : undefined);
 }
 
 export class PullRequestUnavailableError extends Schema.TaggedError<PullRequestUnavailableError>()(

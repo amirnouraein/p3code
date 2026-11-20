@@ -2046,6 +2046,42 @@ layer("GitHubPullRequestApi.layer", (it) => {
     }),
   );
 
+  it.effect("sends one author qualifier per picked author, which GitHub ors", () =>
+    Effect.gen(function* () {
+      mockedExecute.mockImplementation((call) =>
+        Effect.succeed(
+          call.kind === "graphql" && call.operationName === "PullRequestList"
+            ? emptyList()
+            : emptySearch(),
+        ),
+      );
+      const cli = yield* GitHubPullRequestApi.GitHubPullRequestApi;
+      const list = (filters: { author?: string; authors?: ReadonlyArray<string> }) =>
+        cli.listPullRequests({
+          cwd: "/w",
+          repository: "acme/web",
+          host: "github.com",
+          state: "open",
+          involvement: "all",
+          viewer: "bilal",
+          limit: 10,
+          filters,
+        });
+
+      yield* list({ authors: ["me", "octocat"] });
+      const picked = mockedExecute.mock.calls.length;
+      // A typed author must hold too, so it alone narrows the search.
+      yield* list({ author: "ana", authors: ["me", "octocat"] });
+
+      expect(searchOfCall(0)).toBe(
+        'is:pr is:open author:"bilal" author:"octocat" sort:updated-desc repo:acme/web',
+      );
+      expect(searchOfCall(picked)).toBe(
+        'is:pr is:open author:"ana" sort:updated-desc repo:acme/web',
+      );
+    }),
+  );
+
   it.effect(
     "falls back for a repository the index does not cover under a checks filter, keeping only the matching rows",
     () =>
