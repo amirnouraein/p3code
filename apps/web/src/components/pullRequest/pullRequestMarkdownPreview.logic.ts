@@ -1,4 +1,4 @@
-import type { Element, ElementContent, Root } from "hast";
+import type { Element, ElementContent } from "hast";
 
 export interface MarkdownPreviewBlock {
   readonly start: number;
@@ -7,32 +7,23 @@ export interface MarkdownPreviewBlock {
 
 const MARKDOWN_PREVIEW_BLOCK_CLASS = "group/md-block relative";
 
-/**
- * Wraps each top-level block in an element that names its source lines and ends in an empty
- * slot, so review comments can be portaled under the block they are anchored to.
- */
-export function rehypeMarkdownPreviewBlocks() {
-  return (tree: Root) => {
-    tree.children = tree.children.map((node) => {
-      if (node.type !== "element" || !node.position) return node;
-      const { start, end } = node.position;
-      const slot: Element = {
-        type: "element",
-        tagName: "div",
-        properties: { dataPreviewSlot: "" },
-        children: [],
-      };
-      return {
-        type: "element",
-        tagName: "div",
-        properties: {
-          className: MARKDOWN_PREVIEW_BLOCK_CLASS.split(" "),
-          dataSourceStart: start.line,
-          dataSourceEnd: end.line,
-        },
-        children: [node, slot] satisfies ElementContent[],
-      } satisfies Element;
-    });
+/** A block that names its source lines and ends in a slot review comments are portaled into. */
+export function markdownPreviewBlock(
+  children: ElementContent[],
+  lines: MarkdownPreviewBlock,
+): Element {
+  return {
+    type: "element",
+    tagName: "div",
+    properties: {
+      className: MARKDOWN_PREVIEW_BLOCK_CLASS.split(" "),
+      dataSourceStart: lines.start,
+      dataSourceEnd: lines.end,
+    },
+    children: [
+      ...children,
+      { type: "element", tagName: "div", properties: { dataPreviewSlot: "" }, children: [] },
+    ],
   };
 }
 

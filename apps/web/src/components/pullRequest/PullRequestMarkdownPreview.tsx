@@ -5,8 +5,8 @@ import { useGT } from "gt-react";
 import { MessageSquarePlusIcon } from "lucide-react";
 import { Fragment, Suspense, use, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import type { PluggableList } from "unified";
 
+import type { MarkdownExtensions } from "../../markdown/wordsHast";
 import ChatMarkdown from "../ChatMarkdown";
 import { RenderErrorBoundary } from "../RenderErrorBoundary";
 import { Button } from "../ui/button";
@@ -14,11 +14,11 @@ import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import {
   markdownPreviewBlockForLine,
   markdownPreviewCommentRange,
-  rehypeMarkdownPreviewBlocks,
+  markdownPreviewBlock,
   type MarkdownPreviewBlock,
 } from "./pullRequestMarkdownPreview.logic";
 
-const PREVIEW_REHYPE_PLUGINS: PluggableList = [rehypeMarkdownPreviewBlocks];
+const PREVIEW_EXTENSIONS: MarkdownExtensions = { wrapBlock: markdownPreviewBlock };
 
 export interface MarkdownPreviewAnnotation {
   readonly key: string;
@@ -120,7 +120,7 @@ function MarkdownPreviewBody(props: MarkdownPreviewProps) {
           environmentId={props.environmentId}
           sourceControlMedia
           sourceControlMediaRepository={props.repository}
-          extraRehypePlugins={PREVIEW_REHYPE_PLUGINS}
+          extensions={PREVIEW_EXTENSIONS}
           className="mx-auto max-w-4xl py-5 pr-6 pl-12 [&>:first-child>:first-child]:mt-0 [&>:last-child>:first-child]:mb-0"
         />
       </div>
