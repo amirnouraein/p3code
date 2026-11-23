@@ -259,7 +259,7 @@ describe("wordsHast", () => {
     ).toBe('<p dir="ltr">a b c </p>\n<pre><code class="language-text">A\n</code></pre>');
   });
 
-  it("wraps each block with its source lines, or the whole text when blocks are tied", () => {
+  it("wraps each block with its source lines, even when blocks are tied", () => {
     const blockLines = (markdown: string) =>
       wordsHast(markdown, {
         ...ASSISTANT,
@@ -278,7 +278,21 @@ describe("wordsHast", () => {
       "3-9",
       "11-15",
     ]);
-    expect(blockLines("[a][x]\n\n[x]: https://x.dev\n")).toEqual(["1-3"]);
+    expect(blockLines("[a][x]\r\n\r\n[x]: https://x.dev\r\n")).toEqual(["1-1", "3-3"]);
+    const [linked] = wordsHast("[a][x]\n\n[x]: https://x.dev\n", {
+      ...ASSISTANT,
+      extensions: {
+        wrapBlock: (children) => ({
+          type: "element",
+          tagName: "section",
+          properties: {},
+          children,
+        }),
+      },
+    }).children;
+    expect(JSON.stringify(linked)).toContain('"href":"https://x.dev"');
+    // A comment runs past blank lines to its end, so it stays one block.
+    expect(blockLines("<!-- a\n\nb -->\n\n## The `x` command\n")).toEqual(["1-3", "5-5"]);
   });
 
   it("links a change request's references and resolves its root-relative media", () => {

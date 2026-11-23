@@ -1168,8 +1168,12 @@ function wrappedBlocksHast(
 ): Root {
   const { wrapBlock: _, ...extensions } = options.extensions;
   const blockOptions = { ...options, extensions };
+  // Neither changes a line's number.
+  const source = text.replace(/^\ufeff/, "").replaceAll("\r\n", "\n");
+  // Each block renders alone, so it carries every definition its links and footnotes may name.
+  const definitions = source.match(/^ {0,3}\[[^\]\n]+\]:.*$/gm)?.join("\n") ?? "";
   let start = 1;
-  const children = (splitMarkdownBlocks(text) ?? [text]).map((block) => {
+  const children = (splitMarkdownBlocks(source, true) ?? [source]).map((block) => {
     const lines = block.split("\n");
     const end =
       start +
@@ -1177,7 +1181,8 @@ function wrappedBlocksHast(
         0,
         lines.findLastIndex((line) => line.trim() !== ""),
       );
-    const wrapped = wrapBlock(wordsHast(block, blockOptions).children as ElementContent[], {
+    const rendered = definitions === "" ? block : `${block}\n\n${definitions}\n`;
+    const wrapped = wrapBlock(wordsHast(rendered, blockOptions).children as ElementContent[], {
       start,
       end,
     });

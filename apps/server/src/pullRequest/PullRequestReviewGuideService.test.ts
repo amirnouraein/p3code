@@ -18,6 +18,7 @@ import {
   type PullRequestStack,
   type PullRequestRef,
   type RepositoryOrigin,
+  TextGenerationError,
 } from "@t3tools/contracts";
 
 import * as ServerConfig from "../config.ts";
@@ -157,6 +158,7 @@ const makeLayer = (input: {
   readonly lowerSha: string;
   readonly upperSha: string;
   readonly generate: TextGeneration.TextGeneration["Service"]["generateReviewGuide"];
+  readonly answer?: TextGeneration.TextGeneration["Service"]["generatePullRequestAnswer"];
   readonly stored: Deferred.Deferred<void>;
   readonly enabled?: boolean;
   readonly currentHead?: Ref.Ref<string>;
@@ -212,6 +214,7 @@ const makeLayer = (input: {
     Layer.provide(
       Layer.succeed(TextGeneration.TextGeneration, {
         generateReviewGuide: input.generate,
+        generatePullRequestAnswer: input.answer,
       } as unknown as TextGeneration.TextGeneration["Service"]),
     ),
     Layer.provide(ServerSettings.layerTest({ reviewGuidesEnabled: input.enabled ?? true })),
@@ -623,6 +626,44 @@ it.layer(layerBase, { excludeTestServices: true })("PullRequestReviewGuideServic
       );
       const result = yield* Effect.flip(service.generate(reference));
       assert.include(result.message, "in another repository");
+    }),
+  );
+
+  it.effect("answers a question about lines from the pull request and the model's failure", () =>
+    Effect.gen(function* () {
+      const repositories = yield* makeRepositories;
+      const stored = yield* Deferred.make<void>();
+      const context = yield* Layer.build(
+        makeLayer({
+          ...repositories,
+          stored,
+          generate: () => Effect.die("asking must not write a guide"),
+          answer: (input) =>
+            input.question === "Fail?"
+              ? Effect.fail(
+                  new TextGenerationError({
+                    operation: "generatePullRequestAnswer",
+                    detail: "The model is out of credits.",
+                  }),
+                )
+              : Effect.succeed({
+                  answer: [input.cwd, input.title, input.description, input.path, input.excerpt]
+                    .join("|"),
+                }),
+        }),
+      );
+      const service = Context.get(
+        context,
+        PullRequestReviewGuideService.PullRequestReviewGuideService,
+      );
+      const asked = { ...reference, path: "src/a.ts", excerpt: "+x" };
+      const answered = yield* service.ask({ ...asked, question: "Why?" });
+      assert.strictEqual(
+        answered.answer,
+        `${repositories.workspace}|Add the feature|Adds the feature.|src/a.ts|+x`,
+      );
+      const failed = yield* Effect.flip(service.ask({ ...asked, question: "Fail?" }));
+      assert.include(failed.message, "out of credits");
     }),
   );
 });

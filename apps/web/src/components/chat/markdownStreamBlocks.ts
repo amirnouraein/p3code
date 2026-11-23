@@ -15,15 +15,27 @@ const ATX_HEADING_PATTERN =
 // Setext headings may span a paragraph and containers, so leave their parsing to the renderer.
 const SETEXT_UNDERLINE_PATTERN =
   /^(?:[ \t]*(?:>|[-*+](?=[ \t])|\d{1,9}[.)](?=[ \t])))*[ \t]*(?:=+|-+)[ \t]*$/;
+// Raw HTML blocks that run past blank lines to their end marker, as CommonMark's types 1 to 5.
+const SPANNING_HTML_BLOCKS: ReadonlyArray<readonly [open: RegExp, close: RegExp]> = [
+  [/^ {0,3}<(?:script|pre|style|textarea)(?:[\s>]|$)/i, /<\/(?:script|pre|style|textarea)>/i],
+  [/^ {0,3}<!--/, /-->/],
+  [/^ {0,3}<\?/, /\?>/],
+  [/^ {0,3}<![A-Za-z]/, />/],
+  [/^ {0,3}<!\[CDATA\[/, /\]\]>/],
+];
 
 /**
  * Cuts Markdown at blank lines that close every open block, so each piece renders exactly as it
  * would inside the whole text. Returns null when the text uses syntax that spans blocks, such as
- * headings with the same slug, whose ids are numbered across the whole text.
+ * headings with the same slug, whose ids are numbered across the whole text. `lenient` cuts such
+ * text anyway, for callers that accept its pieces rendering a little differently.
  */
-export function splitMarkdownBlocks(text: string): string[] | null {
+export function splitMarkdownBlocks(text: string, lenient = false): string[] | null {
   // remark-parse strips a leading BOM before recognizing the first heading.
-  if (text.startsWith("\ufeff") || text.includes("\r") || DOCUMENT_WIDE_SYNTAX.test(text))
+  if (
+    !lenient &&
+    (text.startsWith("\ufeff") || text.includes("\r") || DOCUMENT_WIDE_SYNTAX.test(text))
+  )
     return null;
   const blocks: string[] = [];
   let blockStart = 0;
@@ -32,6 +44,7 @@ export function splitMarkdownBlocks(text: string): string[] | null {
   let fenceIndent = 0;
   let afterBlankLine = false;
   let insightIndent: string | null = null;
+  let htmlClose: RegExp | null = null;
   const headingKeys = new Set<string>();
   const needsWholeHeading = (headingText: string | undefined) => {
     if (headingText === undefined) return false;
@@ -44,8 +57,9 @@ export function splitMarkdownBlocks(text: string): string[] | null {
     return false;
   };
   const headingNeedsWholeDocument = (line: string, mayUnderline = true) =>
-    (mayUnderline && SETEXT_UNDERLINE_PATTERN.test(line)) ||
-    needsWholeHeading(ATX_HEADING_PATTERN.exec(line)?.[1]);
+    !lenient &&
+    ((mayUnderline && SETEXT_UNDERLINE_PATTERN.test(line)) ||
+      needsWholeHeading(ATX_HEADING_PATTERN.exec(line)?.[1]));
   // Only a line right after paragraph text can underline it; elsewhere "---" is a thematic break.
   let afterContentLine = false;
   for (const line of text.split("\n")) {
@@ -69,6 +83,8 @@ export function splitMarkdownBlocks(text: string): string[] | null {
       ) {
         fence = null;
       }
+    } else if (htmlClose !== null) {
+      if (htmlClose.test(line)) htmlClose = null;
     } else if (insightIndent !== null && INSIGHT_CLOSE_PATTERN.exec(line)?.[1] === insightIndent) {
       insightIndent = null;
       afterBlankLine = false;
@@ -90,6 +106,8 @@ export function splitMarkdownBlocks(text: string): string[] | null {
       if (insightIndent === null) insightIndent = INSIGHT_OPEN_PATTERN.exec(line)?.[1] ?? null;
       fence = opener ?? null;
       if (opener) fenceIndent = line.indexOf(opener);
+      const html = SPANNING_HTML_BLOCKS.find(([open]) => open.test(line));
+      if (html && !html[1].test(line.slice(line.indexOf("<") + 2))) htmlClose = html[1];
     }
     lineStart += line.length + 1;
   }
