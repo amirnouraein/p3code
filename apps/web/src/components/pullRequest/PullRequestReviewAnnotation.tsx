@@ -9,10 +9,12 @@ import type {
   PullRequestThreadComment,
 } from "@t3tools/contracts";
 import {
+  BotIcon,
   HammerIcon,
   MessageSquareIcon,
   MessageSquarePlusIcon,
   Trash2Icon,
+  XIcon,
   CircleCheckIcon,
   CircleIcon,
 } from "lucide-react";
@@ -34,6 +36,7 @@ import {
   visibleBody,
 } from "./pullRequestDetail.logic";
 import { PullRequestActorAvatar, PullRequestActorLabel } from "./pullRequestPresentation";
+import { PullRequestCommentBody } from "./PullRequestCommentBody";
 import { PullRequestMarkdown } from "./PullRequestMarkdown";
 import { PullRequestMarkdownEditor } from "./PullRequestMarkdownEditor";
 import { PullRequestReactionBar } from "./PullRequestReactions";
@@ -116,6 +119,66 @@ export function PendingReviewCommentCard({
         </Button>
       </div>
       <p className="mt-2 whitespace-pre-wrap leading-relaxed">{comment.body}</p>
+    </div>
+  );
+}
+
+/** A model's answer to a question about these lines. It lives only in this view. */
+export interface PullRequestLineAnswer {
+  readonly id: string;
+  readonly reviewKey: string;
+  readonly fileKey: string;
+  readonly side: PullRequestDiffSide;
+  readonly line: number;
+  readonly question: string;
+  readonly status: "pending" | "answered" | "failed";
+  readonly text: string;
+}
+
+export function PullRequestLineAnswerCard({
+  answer,
+  environmentId,
+  cwd,
+  onDismiss,
+}: {
+  answer: PullRequestLineAnswer;
+  environmentId: EnvironmentId;
+  cwd: string;
+  onDismiss: () => void;
+}) {
+  const gt = useGT();
+  return (
+    <div
+      className={CARD_CLASS}
+      contentEditable={false}
+      onPointerDown={(event) => event.stopPropagation()}
+    >
+      <div className="flex items-start gap-2 text-xs text-muted-foreground">
+        <BotIcon className="mt-0.5 size-3.5 shrink-0" />
+        <p className="min-w-0 flex-1 whitespace-pre-wrap">{answer.question}</p>
+        <Button
+          size="icon-xs"
+          variant="ghost"
+          aria-label={gt("Dismiss this answer")}
+          onClick={onDismiss}
+        >
+          <XIcon className="size-3.5" />
+        </Button>
+      </div>
+      {answer.status === "pending" ? (
+        <p className="mt-2 text-muted-foreground">
+          <T>Thinking…</T>
+        </p>
+      ) : answer.status === "failed" ? (
+        <p className="mt-2 text-destructive">{answer.text}</p>
+      ) : (
+        <PullRequestCommentBody
+          className="mt-2"
+          text={answer.text}
+          cwd={cwd}
+          environmentId={environmentId}
+        />
+      )}
     </div>
   );
 }

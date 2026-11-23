@@ -71,6 +71,7 @@
   "cd03eb1b84271c02": "Agent",
   "bfe1a60f3f9c60fb": "Tour {turn} · {what}",
   "dfdaa6255a416140": "Résumé de {turns, plural, one {{turns} tour récent} other {{turns} tours récents}}, {textTurns, plural, =0 {sans texte des messages} one {avec le texte des messages du dernier tour} other {avec le texte des messages des {textTurns} derniers tours}}{truncated, select, yes {, raccourci pour tenir dans la limite} other {}}",
+  "260c6b45f52d2f27": "Ajoute le texte de vos messages et des réponses de l'agent dans {textTurns, plural, one {le dernier tour} other {les {textTurns} derniers tours}}.",
   "afac52a5cc2dc801": "Impossible d'envoyer votre réponse. Réessayez.",
   "79d776428f4d0650": "Le fichier n’a pas pu être chargé. Reconnectez-vous et réessayez.",
   "3ea34cbb1ca5ba9b": "Aperçu annulé.",
@@ -2742,9 +2743,9 @@
   "db7b3a938c45e56c": "Mise à jour {version} prête à être téléchargée",
   "9a951140b69ba740": "Téléchargement de la mise à jour ({percent} %)",
   "7fdece033260e9fb": "Téléchargement de la mise à jour",
+  "52e1d4a487c0cf4b": "Échec de l’installation de {version}. Cliquez pour réessayer.",
   "09ef51903e99e876": "Mise à jour téléchargée. Cliquez pour redémarrer et l’installer.",
   "d62631cab06d2b80": "Mise à jour {version} téléchargée. Cliquez pour redémarrer et l’installer.",
-  "52e1d4a487c0cf4b": "Échec de l’installation de {version}. Cliquez pour réessayer.",
   "78a04e0e625c0990": "Échec de la mise à jour",
   "c24de5eb69373a55": "Cette version {build} ignore les versions {track}. Vérifiez le canal de mise à jour dans les Réglages pour terminer le changement.",
   "b02ae45a6109c93b": "À jour",
@@ -3648,7 +3649,6 @@
   "4e0710d19dfc2e7e": "Envoyer ce rapport à l'équipe T3 ?",
   "87d0ae0723ba75d1": "Voici tout ce qui quitte votre machine. Rien n'est envoyé tant que vous ne cliquez pas sur Envoyer.",
   "bf19826f81484328": "Inclure la conversation",
-  "260c6b45f52d2f27": "Ajoute le texte de vos messages et des réponses de l'agent dans {textTurns, plural, one {le dernier tour} other {les {textTurns} derniers tours}}.",
   "ddb7e6f8ce99e657": "Seule une personne autorisée à exécuter des agents sur cette machine peut l'envoyer ou le refuser.",
   "03c1eb603c112f47": "Ne pas envoyer",
   "653405e4ed498d9f": "Envoyer",
@@ -6672,6 +6672,7 @@
     "checks"
   ],
   "60b56e201607c7ec": "Les détails des checks ne sont plus à jour. Actualisez la pull request pour les mettre à jour.",
+  "f0317add16046282": "Vérifiez le modèle du guide de revue dans Paramètres → Gestion de versions et tickets.",
   "e74cd4e960cbb5e5": "Les lignes inchangées ne sont pas disponibles dans un fichier aux lignes tronquées.",
   "38d6169e04a9a4ce": "Impossible de charger plus de commentaires",
   "909a53aaeab5f1bf": "Impossible de publier la réponse",
@@ -6684,7 +6685,9 @@
   "bd3d2cb8ef7c6f30": "Afficher le diff",
   "e3476fe38e0f287c": "Aperçu Markdown",
   "e545fcdb83e2c36a": "Ajouter à la revue",
+  "97bd8bdd44daed02": "Demander",
   "2250f241daadd71b": "Ajouter à l’agent",
+  "c2c2ec6d9c08c262": "Pose une question sur ces lignes…",
   "be9b06fae29cc07a": "Tous les commits",
   "5ef391d5403d7bdd": "{count, plural, one {Afficher plus ({count} restant)} other {Afficher plus ({count} restants)}}",
   "ccd5fc4db08374d7": "{count, plural, one {{count} fichier de test masqué} other {{count} fichiers de test masqués}}",
@@ -6891,7 +6894,6 @@
   "4e50ba4cf49db170": "Chargement de la conversation de la {term, select, mr {merge request} cr {demande de modification} other {pull request}}",
   "17d60a07476eb42f": "Relecteurs",
   "ab8222ce9132da09": "Description",
-  "f0317add16046282": "Vérifiez le modèle du guide de revue dans Paramètres → Gestion de versions et tickets.",
   "d6695ad018acf06f": "Lecture de la modification...",
   "df06e4551efa7020": "Rédaction d’un guide de revue",
   "a38f0b48f07411c7": "Pas encore de guide de revue",
@@ -6991,6 +6993,7 @@
   "592fc2a3701afa9d": "Rouvrir",
   "ccab0165663bc6dc": "Résoudre",
   "bca1cd3b358dcf2c": "Abandonner ce commentaire",
+  "310edfbfda52e2f2": "Masquer cette réponse",
   "c0257180840458bc": "{count, plural, =1 {Conversation résolue} other {{count} conversations résolues}}",
   "9e65f6bc12538296": "Résolue",
   "d74fc95719fe5478": "Ouverte",
@@ -6999,6 +7002,7 @@
   "3f9bc820dffd099f": "Répondre",
   "7975bd47236d8207": "Répondre à cette conversation",
   "8fa405d27bb3180a": "En attente. Envoyé quand vous soumettez la revue",
+  "76c7db717571ae61": "Réflexion…",
   "9dde74668b73ad29": "Répondre",
   "904e8e33ad31d233": "Commenter",
   "7e0db7bc417222c3": "Revue soumise",
@@ -8774,9 +8778,13 @@
   "ed83b25c71c98a20": "Choisissez un ou plusieurs {scope}s {tracker} pour chaque projet. Leurs tickets s'affichent à côté de ceux du dépôt, et les agents créent les nouveaux tickets dans le premier, sauf si vous leur indiquez une autre destination.",
   "19c2d5e81ff8f89a": "{scope} {tracker} pour {project}",
   "68e061510b765772": "Non lié",
+  "99d51127f573296b": "Autre compte",
+  "8ec2c57414669b79": "Connectez un second espace de travail ou utilisateur {tracker}.",
+  "99963c0142e17f00": "Pour le nouveau compte {tracker}.",
   "a2d95d39d3398bda": "Identifiant refusé",
   "9eae463720500113": "Stocké sur le serveur.",
   "b6e27ab2537ef874": "En créer un",
+  "6d8e4ebc889bace9": "Ajouter un compte",
   "13ef526271b0f5d4": "Effacer toutes les conditions",
   "d1938a629f039515": "Supprimer la condition",
   "84a605b241ce65b7": "Supprimer le groupe et ses conditions",
@@ -12622,6 +12630,16 @@
   "156ff7b625287a1e": "Masquer les éléments ignorés",
   "69b985b97ab45e6b": "Afficher {count} ignorés",
   "2400254d362de84d": "Chargement des exécutions de workflow…",
+  "cae5c3205c01d062": [
+    {
+      "t": "span",
+      "i": 1,
+      "c": "Un fichier de workflow présente un problème."
+    },
+    " ",
+    "La dernière version valide continue de s’exécuter."
+  ],
+  "ed8ce6ebc73dc12d": "Ouvrir le fichier",
   "145e1f7503ba3b2c": [
     "Cet environnement n’a aucune exécution avec ce lien.",
     " ",
@@ -12647,16 +12665,6 @@
       "c": "Lire le guide"
     }
   ],
-  "cae5c3205c01d062": [
-    {
-      "t": "span",
-      "i": 1,
-      "c": "Un fichier de workflow présente un problème."
-    },
-    " ",
-    "La dernière version valide continue de s’exécuter."
-  ],
-  "ed8ce6ebc73dc12d": "Ouvrir le fichier",
   "5d8d278ff828102d": "Tous les workflows",
   "39459da07479f482": "Agent",
   "7741243632056b81": "{step} · transcription",
@@ -12801,9 +12809,5 @@
   "27d76249d09eb69f": "Guide de revue prêt",
   "faa3bb26abb39c93": "Échec du guide de revue",
   "b7df38b7d8792d78": "Ouvrir le guide",
-  "9e91e9a77b664e4e": "Impossible de démarrer un guide de revue",
-  "99d51127f573296b": "Autre compte",
-  "8ec2c57414669b79": "Connectez un second espace de travail ou utilisateur {tracker}.",
-  "99963c0142e17f00": "Pour le nouveau compte {tracker}.",
-  "6d8e4ebc889bace9": "Ajouter un compte"
+  "9e91e9a77b664e4e": "Impossible de démarrer un guide de revue"
 }

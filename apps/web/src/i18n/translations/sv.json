@@ -71,6 +71,7 @@
   "cd03eb1b84271c02": "Agent",
   "bfe1a60f3f9c60fb": "Omgång {turn} · {what}",
   "dfdaa6255a416140": "Översikt över {turns, plural, one {{turns} senaste omgång} other {{turns} senaste omgångar}}, {textTurns, plural, =0 {ingen meddelandetext} one {meddelandetext från den senaste omgången} other {meddelandetext från de senaste {textTurns} omgångarna}}{truncated, select, yes {, förkortad för att få plats} other {}}",
+  "260c6b45f52d2f27": "Lägger till texten i dina meddelanden och agentens svar under {textTurns, plural, one {den senaste omgången} other {de senaste {textTurns} omgångarna}}.",
   "afac52a5cc2dc801": "Det gick inte att skicka ditt svar. Försök igen.",
   "79d776428f4d0650": "Filen kunde inte läsas in. Återanslut och försök igen.",
   "3ea34cbb1ca5ba9b": "Förhandsvisningen avbröts.",
@@ -2742,9 +2743,9 @@
   "db7b3a938c45e56c": "Uppdateringen {version} är redo att laddas ned",
   "9a951140b69ba740": "Laddar ned uppdatering ({percent} %)",
   "7fdece033260e9fb": "Laddar ned uppdatering",
+  "52e1d4a487c0cf4b": "Installationen av {version} misslyckades. Klicka för att försöka igen.",
   "09ef51903e99e876": "Uppdateringen har laddats ned. Klicka för att starta om och installera.",
   "d62631cab06d2b80": "Uppdateringen {version} har laddats ned. Klicka för att starta om och installera.",
-  "52e1d4a487c0cf4b": "Installationen av {version} misslyckades. Klicka för att försöka igen.",
   "78a04e0e625c0990": "Uppdateringen misslyckades",
   "c24de5eb69373a55": "Den här {build}-versionen ignorerar {track}-versioner. Granska uppdateringsspåret i Inställningar för att slutföra bytet.",
   "b02ae45a6109c93b": "Uppdaterad",
@@ -3648,7 +3649,6 @@
   "4e0710d19dfc2e7e": "Skicka den här rapporten till T3-teamet?",
   "87d0ae0723ba75d1": "Det här är allt som lämnar din dator. Inget skickas förrän du trycker på Skicka.",
   "bf19826f81484328": "Ta med konversationen",
-  "260c6b45f52d2f27": "Lägger till texten i dina meddelanden och agentens svar under {textTurns, plural, one {den senaste omgången} other {de senaste {textTurns} omgångarna}}.",
   "ddb7e6f8ce99e657": "Bara den som kan köra agenter på den här datorn kan skicka eller avböja rapporten.",
   "03c1eb603c112f47": "Skicka inte",
   "653405e4ed498d9f": "Skicka",
@@ -6677,6 +6677,7 @@
     "kontroller"
   ],
   "60b56e201607c7ec": "Kontrolldetaljerna är inaktuella. Uppdatera pull requesten för att uppdatera dem.",
+  "f0317add16046282": "Kontrollera modellen för granskningsguider i Inställningar → Versionshantering och ärenden.",
   "e74cd4e960cbb5e5": "Oförändrade rader är inte tillgängliga i en fil med bortklippta rader.",
   "38d6169e04a9a4ce": "Fler kommentarer kunde inte läsas in",
   "909a53aaeab5f1bf": "Svaret kunde inte publiceras",
@@ -6689,7 +6690,9 @@
   "bd3d2cb8ef7c6f30": "Visa diff",
   "e3476fe38e0f287c": "Förhandsgranska Markdown",
   "e545fcdb83e2c36a": "Lägg till i granskning",
+  "97bd8bdd44daed02": "Fråga",
   "2250f241daadd71b": "Lägg till för agent",
+  "c2c2ec6d9c08c262": "Fråga om de här raderna…",
   "be9b06fae29cc07a": "Alla commits",
   "5ef391d5403d7bdd": "{count, plural, one {Visa fler ({count} kvar)} other {Visa fler ({count} kvar)}}",
   "ccd5fc4db08374d7": "{count, plural, one {{count} testfil dold} other {{count} testfiler dolda}}",
@@ -6896,7 +6899,6 @@
   "4e50ba4cf49db170": "Läser in konversationen för {term, select, mr {merge requesten} cr {ändringsbegäran} other {pull requesten}}",
   "17d60a07476eb42f": "Granskare",
   "ab8222ce9132da09": "Beskrivning",
-  "f0317add16046282": "Kontrollera modellen för granskningsguider i Inställningar → Versionshantering och ärenden.",
   "d6695ad018acf06f": "Läser ändringen...",
   "df06e4551efa7020": "Skriver en granskningsguide",
   "a38f0b48f07411c7": "Ingen granskningsguide än",
@@ -6996,6 +6998,7 @@
   "592fc2a3701afa9d": "Markera som olöst",
   "ccab0165663bc6dc": "Markera som löst",
   "bca1cd3b358dcf2c": "Kasta den här kommentaren",
+  "310edfbfda52e2f2": "Stäng det här svaret",
   "c0257180840458bc": "{count, plural, =1 {Löst konversation} other {{count} lösta konversationer}}",
   "9e65f6bc12538296": "Löst",
   "d74fc95719fe5478": "Öppen",
@@ -7004,6 +7007,7 @@
   "3f9bc820dffd099f": "Svar",
   "7975bd47236d8207": "Svara i den här konversationen",
   "8fa405d27bb3180a": "Väntande. Skickas när du skickar granskningen",
+  "76c7db717571ae61": "Tänker…",
   "9dde74668b73ad29": "Svara",
   "904e8e33ad31d233": "Kommentar",
   "7e0db7bc417222c3": "Granskningen skickades",
@@ -8781,9 +8785,13 @@
   "ed83b25c71c98a20": "Välj en eller flera {scope} i {tracker} för varje projekt. Deras ärenden listas bredvid repots egna, och agenter skapar nya ärenden i det första om de inte ombeds välja ett annat.",
   "19c2d5e81ff8f89a": "{scope} i {tracker} för {project}",
   "68e061510b765772": "Inte kopplad",
+  "99d51127f573296b": "Ett konto till",
+  "8ec2c57414669b79": "Anslut en andra {tracker}-arbetsyta eller användare.",
+  "99963c0142e17f00": "För det nya {tracker}-kontot.",
   "a2d95d39d3398bda": "Autentiseringsuppgiften avvisades",
   "9eae463720500113": "Lagras på servern.",
   "b6e27ab2537ef874": "Skapa en",
+  "6d8e4ebc889bace9": "Lägg till konto",
   "13ef526271b0f5d4": "Rensa alla villkor",
   "d1938a629f039515": "Ta bort villkor",
   "84a605b241ce65b7": "Ta bort gruppen och dess villkor",
@@ -12630,6 +12638,16 @@
   "156ff7b625287a1e": "Dölj överhoppade",
   "69b985b97ab45e6b": "Visa överhoppade ({count})",
   "2400254d362de84d": "Läser in arbetsflödeskörningar…",
+  "cae5c3205c01d062": [
+    {
+      "t": "span",
+      "i": 1,
+      "c": "En arbetsflödesfil har ett problem."
+    },
+    " ",
+    "Den senaste versionen som gick att läsa in körs vidare."
+  ],
+  "ed8ce6ebc73dc12d": "Öppna filen",
   "145e1f7503ba3b2c": [
     "Den här miljön har ingen körning med den länken.",
     " ",
@@ -12655,16 +12673,6 @@
       "c": "Läs guiden"
     }
   ],
-  "cae5c3205c01d062": [
-    {
-      "t": "span",
-      "i": 1,
-      "c": "En arbetsflödesfil har ett problem."
-    },
-    " ",
-    "Den senaste versionen som gick att läsa in körs vidare."
-  ],
-  "ed8ce6ebc73dc12d": "Öppna filen",
   "5d8d278ff828102d": "Alla arbetsflöden",
   "39459da07479f482": "Agent",
   "7741243632056b81": "{step} · transkript",
@@ -12808,9 +12816,5 @@
   "27d76249d09eb69f": "Granskningsguiden är klar",
   "faa3bb26abb39c93": "Granskningsguiden misslyckades",
   "b7df38b7d8792d78": "Öppna guiden",
-  "9e91e9a77b664e4e": "Kunde inte starta en granskningsguide",
-  "99d51127f573296b": "Ett konto till",
-  "8ec2c57414669b79": "Anslut en andra {tracker}-arbetsyta eller användare.",
-  "99963c0142e17f00": "För det nya {tracker}-kontot.",
-  "6d8e4ebc889bace9": "Lägg till konto"
+  "9e91e9a77b664e4e": "Kunde inte starta en granskningsguide"
 }

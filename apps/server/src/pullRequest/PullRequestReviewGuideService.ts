@@ -12,6 +12,8 @@ import * as Semaphore from "effect/Semaphore";
 
 import {
   PullRequestOperationError,
+  type PullRequestAskInput,
+  type PullRequestAskResult,
   type PullRequestDetail,
   type PullRequestRef,
   type PullRequestReviewGuide,
@@ -52,6 +54,9 @@ export class PullRequestReviewGuideService extends Context.Service<
       PullRequestReviewGuideResult & { readonly started: boolean },
       PullRequestService.PullRequestError
     >;
+    readonly ask: (
+      input: PullRequestAskInput,
+    ) => Effect.Effect<PullRequestAskResult, PullRequestService.PullRequestError>;
   }
 >()("t3/pullRequest/PullRequestReviewGuideService") {}
 
@@ -526,7 +531,57 @@ const make = Effect.gen(function* () {
     return { guide: stored, run: running, currentHeadSha, started: true };
   });
 
-  return PullRequestReviewGuideService.of({ get, generate });
+  const ask: PullRequestReviewGuideService["Service"]["ask"] = Effect.fn(
+    "PullRequestReviewGuideService.ask",
+  )(function* (input) {
+    const { workspaceRoot } = yield* keyFor(input);
+    const [detail, settings, providers] = yield* Effect.all(
+      [
+        pullRequests.detail(input),
+        serverSettings.getSettings.pipe(
+          Effect.mapError(
+            (cause) =>
+              new PullRequestOperationError({
+                operation: "askAboutPullRequest",
+                detail: "Could not read the server settings.",
+                cause,
+              }),
+          ),
+        ),
+        providerRegistry.getProviders,
+      ],
+      { concurrency: "unbounded" },
+    );
+    const { answer } = yield* textGeneration
+      .generatePullRequestAnswer({
+        cwd: workspaceRoot,
+        modelSelection: ServerSettings.resolveReviewGuideModelSelection(
+          resolveProjectSettings(settings, input.projectId).settings,
+          providers,
+          input.projectId,
+        ),
+        projectId: input.projectId,
+        number: detail.number,
+        title: detail.title,
+        description: detail.body,
+        path: input.path,
+        excerpt: input.excerpt,
+        question: input.question,
+      })
+      .pipe(
+        Effect.mapError(
+          (cause) =>
+            new PullRequestOperationError({
+              operation: "askAboutPullRequest",
+              detail: cause.detail.trim() || "The model could not answer.",
+              cause,
+            }),
+        ),
+      );
+    return { answer };
+  });
+
+  return PullRequestReviewGuideService.of({ get, generate, ask });
 });
 
 export const layer = Layer.effect(PullRequestReviewGuideService, make);

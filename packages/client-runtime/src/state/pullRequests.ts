@@ -1523,6 +1523,11 @@ export function createPullRequestEnvironmentAtoms<R, E>(
         }),
     }),
     reviewGuide,
+    ask: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:pull-requests:ask",
+      tag: WS_METHODS.pullRequestsAsk,
+      execute: (input) => routedRequest(WS_METHODS.pullRequestsAsk, input),
+    }),
     generateReviewGuide: createEnvironmentRpcCommand(runtime, {
       label: "environment-data:pull-requests:generate-review-guide",
       tag: WS_METHODS.pullRequestsGenerateReviewGuide,

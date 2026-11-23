@@ -75,6 +75,7 @@ import { useRenderedAppearance } from "~/hooks/useTheme";
 import { areAllDiffFilesCollapsed } from "~/lib/diffCollapse";
 import {
   pullRequestFindingKey,
+  readableFailure,
   type PullRequestChatSubject,
   type PullRequestFinding,
 } from "./pullRequestDetail.logic";
@@ -141,6 +142,8 @@ import {
   getReviewPositionAnchor,
   InlineReviewThreads,
   PendingReviewCommentCard,
+  PullRequestLineAnswerCard,
+  type PullRequestLineAnswer,
   ReviewThreadCard,
   toViewerSide,
 } from "./PullRequestReviewAnnotation";
@@ -170,6 +173,7 @@ interface ReviewAnnotationGroup {
   readonly threads: ReadonlyArray<PullRequestReviewThread>;
   readonly pending: ReadonlyArray<PendingReviewComment>;
   readonly draft: boolean;
+  readonly answers?: ReadonlyArray<PullRequestLineAnswer>;
   readonly image?: { readonly url: string; readonly path: string };
   readonly withheld?: { readonly path: string; readonly status: WithheldFileStatus };
   /** A Markdown file shown rendered, carrying the annotations its diff rows would have held. */
@@ -388,6 +392,7 @@ interface MutableAnnotationGroup {
   readonly line: number;
   readonly threads: PullRequestReviewThread[];
   readonly pending: PendingReviewComment[];
+  readonly answers: PullRequestLineAnswer[];
   draft: boolean;
 }
 
@@ -639,6 +644,9 @@ function PullRequestCodeTab({
     reportFailure: false,
   });
   const getDiffFileContents = useAtomCommand(pullRequestEnvironment.diffFileContents);
+  const canAsk = useAtomValue(pullRequestEnvironment.ask.permissionAtom(environmentId));
+  const askCommand = useAtomCommand(pullRequestEnvironment.ask, { reportFailure: false });
+  const [answers, setAnswers] = useState<ReadonlyArray<PullRequestLineAnswer>>([]);
 
   const viewedFilesStore = detail.capabilities.viewedFiles;
   const filesViewed = usePullRequestFilesViewed({
@@ -737,7 +745,7 @@ function PullRequestCodeTab({
   const rangeComments = hostReview.rangeComment === true;
   // Agent context is local, so it does not require host comment permission.
   const canSelectLines =
-    commit === null && (review.inlineComment || onAddToAgentSelection !== undefined);
+    commit === null && (review.inlineComment || onAddToAgentSelection !== undefined || canAsk);
   const {
     parsedSlices,
     loadedFiles: pagedFiles,
@@ -903,6 +911,7 @@ function PullRequestCodeTab({
         line,
         threads: [],
         pending: [],
+        answers: [],
         draft: false,
       };
       groups.set(key, created);
@@ -924,11 +933,20 @@ function PullRequestCodeTab({
       const anchor = getReviewPositionAnchor(draft.position);
       groupAt(anchor.side, anchor.line).draft = true;
     }
+    for (const answer of answers) {
+      if (answer.reviewKey !== reviewKey || answer.fileKey !== fileKey) continue;
+      groupAt(answer.side, answer.line).answers.push(answer);
+    }
 
     const annotations: ReviewAnnotation[] = [...groups.values()].map((group) => ({
       side: toViewerSide(group.side),
       lineNumber: group.line,
-      metadata: { threads: group.threads, pending: group.pending, draft: group.draft },
+      metadata: {
+        threads: group.threads,
+        pending: group.pending,
+        draft: group.draft,
+        answers: group.answers,
+      },
     }));
     const imageUrl = imagePreviewUrl(fileDiff, path);
     if (imageUrl !== null) {
@@ -981,7 +999,11 @@ function PullRequestCodeTab({
           annotations
             .map(
               ({ side, lineNumber, metadata }) =>
-                `${side}:${lineNumber}:${metadata.image?.url ?? ""}:${metadata.withheld?.status ?? ""}:${metadata.draft ? "d" : ""}:${metadata.pending
+                `${side}:${lineNumber}:${metadata.image?.url ?? ""}:${metadata.withheld?.status ?? ""}:${metadata.draft ? "d" : ""}:${(
+                  metadata.answers ?? []
+                )
+                  .map((answer) => `${answer.id}:${answer.status}`)
+                  .join(",")}:${metadata.pending
                   .map((comment) => `${comment.id}:${comment.body}`)
                   .join(",")}:${metadata.threads
                   .map(
@@ -1209,6 +1231,44 @@ function PullRequestCodeTab({
     setDraft(null);
     setSelectedLines(null);
     if (comment !== null) onFinish(comment);
+  };
+
+  const askAboutSelection = (anchor: DraftAnchor, question: string) => {
+    const { side, line } = getReviewPositionAnchor(anchor.position);
+    finishSelection(anchor, question, (comment) => {
+      const id = nextPendingReviewCommentId();
+      const settle = (status: PullRequestLineAnswer["status"], text: string) =>
+        setAnswers((current) =>
+          current.map((answer) => (answer.id === id ? { ...answer, status, text } : answer)),
+        );
+      setAnswers((current) => [
+        ...current,
+        {
+          id,
+          reviewKey,
+          fileKey: anchor.fileKey,
+          side,
+          line,
+          question,
+          status: "pending",
+          text: "",
+        },
+      ]);
+      void askCommand({
+        environmentId,
+        input: { ...reference, path: anchor.path, excerpt: comment.diff, question },
+      }).then((result) =>
+        result._tag === "Success"
+          ? settle("answered", result.value.answer)
+          : settle(
+              "failed",
+              readableFailure(
+                squashAtomCommandFailure(result),
+                m(msg("Check the review guide model in Settings → Source control & issues.")),
+              ),
+            ),
+      );
+    });
   };
 
   // Stable props preserve viewer portals during selection, typing, and review updates.
@@ -1471,6 +1531,47 @@ function PullRequestCodeTab({
     );
   };
 
+  const draftActions =
+    draft === null
+      ? []
+      : [
+          canCommentOnLines
+            ? {
+                label: gt("Add to review"),
+                onAction: (body: string) => {
+                  addComment(reviewKey, {
+                    id: nextPendingReviewCommentId(),
+                    path: draft.path,
+                    ...(draft.oldPath === null ? {} : { oldPath: draft.oldPath }),
+                    ...(draft.startPosition === undefined
+                      ? {}
+                      : { startPosition: draft.startPosition }),
+                    position: draft.position,
+                    body,
+                  });
+                  setDraft(null);
+                  setSelectedLines(null);
+                },
+              }
+            : null,
+          canAsk
+            ? {
+                label: gt("Ask", { $context: "button: ask a model about the selected lines" }),
+                onAction: (question: string) => askAboutSelection(draft, question),
+              }
+            : null,
+          onAddToAgentSelection
+            ? {
+                label: gt("Add to agent"),
+                onAction: (text: string) =>
+                  finishSelection(draft, text, (comment) =>
+                    onAddToAgentSelection({ comment, request: text }),
+                  ),
+              }
+            : null,
+        ].filter((action) => action !== null);
+  const [primaryDraftAction, ...secondaryDraftActions] = draftActions;
+
   const renderAnnotationBody = (metadata: ReviewAnnotationGroup) => (
     // Folded resolved conversations alone add no row, so the code reads straight through.
     <div className="relative font-sans text-foreground has-[>:not([data-resolved-threads])]:py-1">
@@ -1502,6 +1603,17 @@ function PullRequestCodeTab({
           onRemove={() => removeComment(reviewKey, comment.id)}
         />
       ))}
+      {metadata.answers?.map((answer) => (
+        <PullRequestLineAnswerCard
+          key={answer.id}
+          answer={answer}
+          environmentId={environmentId}
+          cwd={detail.workspaceRoot}
+          onDismiss={() =>
+            setAnswers((current) => current.filter((candidate) => candidate.id !== answer.id))
+          }
+        />
+      ))}
       {metadata.draft && draft && canSelectLines ? (
         <DiffCommentAnnotation
           environmentId={environmentId}
@@ -1511,42 +1623,14 @@ function PullRequestCodeTab({
           rangeLabel={`${draft.path}:${getReviewPositionAnchor(draft.position).line}`}
           text=""
           completionScope={canCommentOnLines ? completionScope : null}
-          submitLabel={canCommentOnLines ? gt("Add to review") : gt("Add to agent")}
-          {...(canCommentOnLines && onAddToAgentSelection
-            ? {
-                secondaryAction: {
-                  label: gt("Add to agent"),
-                  onAction: (text: string) =>
-                    finishSelection(draft, text, (comment) =>
-                      onAddToAgentSelection({ comment, request: text }),
-                    ),
-                },
-              }
-            : {})}
+          {...(canCommentOnLines ? {} : { placeholder: gt("Ask about these lines…") })}
+          {...(primaryDraftAction ? { submitLabel: primaryDraftAction.label } : {})}
+          secondaryActions={secondaryDraftActions}
           onCancel={() => {
             setDraft(null);
             setSelectedLines(null);
           }}
-          onComment={(body) => {
-            if (!canCommentOnLines) {
-              if (onAddToAgentSelection) {
-                finishSelection(draft, body, (comment) =>
-                  onAddToAgentSelection({ comment, request: body }),
-                );
-              }
-              return;
-            }
-            addComment(reviewKey, {
-              id: nextPendingReviewCommentId(),
-              path: draft.path,
-              ...(draft.oldPath === null ? {} : { oldPath: draft.oldPath }),
-              ...(draft.startPosition === undefined ? {} : { startPosition: draft.startPosition }),
-              position: draft.position,
-              body,
-            });
-            setDraft(null);
-            setSelectedLines(null);
-          }}
+          onComment={(body) => primaryDraftAction?.onAction(body)}
         />
       ) : null}
     </div>

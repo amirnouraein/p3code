@@ -226,6 +226,11 @@ function selectOpenCodeRuntimeTextGeneration(
         v1: v1.generateReviewGuide(input),
         v2: v2.generateReviewGuide(input),
       }),
+    generatePullRequestAnswer: (input) =>
+      byOpenCodeRuntime(resolve, {
+        v1: v1.generatePullRequestAnswer(input),
+        v2: v2.generatePullRequestAnswer(input),
+      }),
     generateTranscriptionPostProcessing: (input) =>
       byOpenCodeRuntime(resolve, {
         v1: v1.generateTranscriptionPostProcessing(input),

@@ -71,6 +71,7 @@
   "cd03eb1b84271c02": "Agent",
   "bfe1a60f3f9c60fb": "Turn {turn} · {what}",
   "dfdaa6255a416140": "Outline of {turns, plural, one {{turns} recent turn} other {{turns} recent turns}}, {textTurns, plural, =0 {no message text} one {message text of the last turn} other {message text of the last {textTurns} turns}}{truncated, select, yes {, shortened to fit} other {}}",
+  "260c6b45f52d2f27": "Adds the text of your messages and the agent's replies in the last {textTurns, plural, one {turn} other {{textTurns} turns}}.",
   "afac52a5cc2dc801": "Could not send your answer. Try again.",
   "79d776428f4d0650": "The file could not be loaded. Reconnect and try again.",
   "3ea34cbb1ca5ba9b": "Preview cancelled.",
@@ -2742,9 +2743,9 @@
   "db7b3a938c45e56c": "Update {version} ready to download",
   "9a951140b69ba740": "Downloading update ({percent}%)",
   "7fdece033260e9fb": "Downloading update",
+  "52e1d4a487c0cf4b": "Install failed for {version}. Click to retry.",
   "09ef51903e99e876": "Update ready downloaded. Click to restart and install.",
   "d62631cab06d2b80": "Update {version} downloaded. Click to restart and install.",
-  "52e1d4a487c0cf4b": "Install failed for {version}. Click to retry.",
   "78a04e0e625c0990": "Update failed",
   "c24de5eb69373a55": "This {build} build ignores {track} releases. Review the update track in Settings to finish the switch.",
   "b02ae45a6109c93b": "Up to date",
@@ -3648,7 +3649,6 @@
   "4e0710d19dfc2e7e": "Send this report to the T3 team?",
   "87d0ae0723ba75d1": "This is everything that leaves your machine. Nothing is sent unless you press Send.",
   "bf19826f81484328": "Include the conversation",
-  "260c6b45f52d2f27": "Adds the text of your messages and the agent's replies in the last {textTurns, plural, one {turn} other {{textTurns} turns}}.",
   "ddb7e6f8ce99e657": "Only someone who can run agents on this machine can send or decline it.",
   "03c1eb603c112f47": "Don't send",
   "653405e4ed498d9f": "Send",
@@ -6678,6 +6678,7 @@
     "checks"
   ],
   "60b56e201607c7ec": "Check details are out of date. Refresh the pull request to update them.",
+  "f0317add16046282": "Check the review guide model in Settings → Source control & issues.",
   "e74cd4e960cbb5e5": "Unchanged lines are unavailable in a file with cut lines.",
   "38d6169e04a9a4ce": "More comments could not be loaded",
   "909a53aaeab5f1bf": "Reply could not be posted",
@@ -6690,7 +6691,9 @@
   "bd3d2cb8ef7c6f30": "Show diff",
   "e3476fe38e0f287c": "Preview Markdown",
   "e545fcdb83e2c36a": "Add to review",
+  "97bd8bdd44daed02": "Ask",
   "2250f241daadd71b": "Add to agent",
+  "c2c2ec6d9c08c262": "Ask about these lines…",
   "be9b06fae29cc07a": "All commits",
   "5ef391d5403d7bdd": "{count, plural, one {Show more ({count} left)} other {Show more ({count} left)}}",
   "ccd5fc4db08374d7": "{count, plural, one {{count} test file hidden} other {{count} test files hidden}}",
@@ -6897,7 +6900,6 @@
   "4e50ba4cf49db170": "Loading {term, select, mr {merge request} cr {change request} other {pull request}} conversation",
   "17d60a07476eb42f": "Reviewers",
   "ab8222ce9132da09": "Description",
-  "f0317add16046282": "Check the review guide model in Settings → Source control & issues.",
   "d6695ad018acf06f": "Reading the change...",
   "df06e4551efa7020": "Writing a review guide",
   "a38f0b48f07411c7": "No review guide yet",
@@ -6997,6 +6999,7 @@
   "592fc2a3701afa9d": "Unresolve",
   "ccab0165663bc6dc": "Resolve",
   "bca1cd3b358dcf2c": "Discard this comment",
+  "310edfbfda52e2f2": "Dismiss this answer",
   "c0257180840458bc": "{count, plural, =1 {Resolved conversation} other {{count} resolved conversations}}",
   "9e65f6bc12538296": "Resolved",
   "d74fc95719fe5478": "Open",
@@ -7005,6 +7008,7 @@
   "3f9bc820dffd099f": "Reply",
   "7975bd47236d8207": "Reply to this conversation",
   "8fa405d27bb3180a": "Pending. Sent when you submit the review",
+  "76c7db717571ae61": "Thinking…",
   "9dde74668b73ad29": "Reply",
   "904e8e33ad31d233": "Comment",
   "7e0db7bc417222c3": "Review submitted",
@@ -8783,9 +8787,13 @@
   "ed83b25c71c98a20": "Pick one or more {tracker} {scope}s for each project. Their issues list beside the repository's own, and agents file new issues in the first one unless asked for another.",
   "19c2d5e81ff8f89a": "{tracker} {scope} for {project}",
   "68e061510b765772": "Not bound",
+  "99d51127f573296b": "Another account",
+  "8ec2c57414669b79": "Connect a second {tracker} workspace or user.",
+  "99963c0142e17f00": "For the new {tracker} account.",
   "a2d95d39d3398bda": "Credential rejected",
   "9eae463720500113": "Stored on the server.",
   "b6e27ab2537ef874": "Create one",
+  "6d8e4ebc889bace9": "Add account",
   "13ef526271b0f5d4": "Clear all conditions",
   "d1938a629f039515": "Remove condition",
   "84a605b241ce65b7": "Remove group and its conditions",
@@ -12632,6 +12640,16 @@
   "156ff7b625287a1e": "Hide skipped",
   "69b985b97ab45e6b": "Show {count} skipped",
   "2400254d362de84d": "Loading workflow runs…",
+  "cae5c3205c01d062": [
+    {
+      "t": "span",
+      "i": 1,
+      "c": "A workflow file has a problem."
+    },
+    " ",
+    "The last version that did keeps running."
+  ],
+  "ed8ce6ebc73dc12d": "Open the file",
   "145e1f7503ba3b2c": [
     "This environment has no run with that link.",
     " ",
@@ -12657,16 +12675,6 @@
       "c": "Read the guide"
     }
   ],
-  "cae5c3205c01d062": [
-    {
-      "t": "span",
-      "i": 1,
-      "c": "A workflow file has a problem."
-    },
-    " ",
-    "The last version that did keeps running."
-  ],
-  "ed8ce6ebc73dc12d": "Open the file",
   "5d8d278ff828102d": "All workflows",
   "39459da07479f482": "Agent",
   "7741243632056b81": "{step} · transcript",
@@ -12810,9 +12818,5 @@
   "27d76249d09eb69f": "Review guide ready",
   "faa3bb26abb39c93": "Review guide failed",
   "b7df38b7d8792d78": "Open guide",
-  "9e91e9a77b664e4e": "Could not start a review guide",
-  "99d51127f573296b": "Another account",
-  "8ec2c57414669b79": "Connect a second {tracker} workspace or user.",
-  "99963c0142e17f00": "For the new {tracker} account.",
-  "6d8e4ebc889bace9": "Add account"
+  "9e91e9a77b664e4e": "Could not start a review guide"
 }

@@ -9,7 +9,10 @@ import type {
 import type * as Effect from "effect/Effect";
 
 import type { TextGenerationPolicy } from "./textGenerationPolicy.ts";
-import type { ThreadTitleForkSource } from "./textGenerationPrompts.ts";
+import type {
+  PullRequestAnswerPromptInput,
+  ThreadTitleForkSource,
+} from "./textGenerationPrompts.ts";
 
 export interface CommitMessageGenerationInput {
   cwd: string;
@@ -114,6 +117,16 @@ export interface TranscriptionPostProcessingResult {
   transcription: string;
 }
 
+export interface PullRequestAnswerGenerationInput extends PullRequestAnswerPromptInput {
+  cwd: string;
+  modelSelection: ModelSelection;
+  projectId?: ProjectId | null | undefined;
+}
+
+export interface PullRequestAnswerGenerationResult {
+  answer: string;
+}
+
 export interface ProviderTextGeneration {
   readonly generateTranscriptionPostProcessing: (
     input: TranscriptionPostProcessingInput,
@@ -138,4 +151,8 @@ export interface ProviderTextGeneration {
   readonly generateReviewGuide: (
     input: ReviewGuideGenerationInput,
   ) => Effect.Effect<ReviewGuideGenerationResult, TextGenerationError>;
+
+  readonly generatePullRequestAnswer: (
+    input: PullRequestAnswerGenerationInput,
+  ) => Effect.Effect<PullRequestAnswerGenerationResult, TextGenerationError>;
 }

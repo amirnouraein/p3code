@@ -386,10 +386,12 @@ export function GuideCommentDraft({
       submitLabel={commenting.canComment ? gt("Add to review") : gt("Ask agent")}
       {...(commenting.canComment && onAskAgent !== null
         ? {
-            secondaryAction: {
-              label: gt("Ask agent"),
-              onAction: (text: string) => askAgent(text),
-            },
+            secondaryActions: [
+              {
+                label: gt("Ask agent"),
+                onAction: (text: string) => askAgent(text),
+              },
+            ],
           }
         : {})}
       onCancel={onClose}

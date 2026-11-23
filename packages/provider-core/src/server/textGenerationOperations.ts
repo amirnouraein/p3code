@@ -10,6 +10,7 @@ import {
   buildBranchNamePrompt,
   buildCommitMessagePrompt,
   buildPrContentPrompt,
+  buildPullRequestAnswerPrompt,
   buildReviewGuidePrompt,
   buildThreadTitlePrompt,
 } from "./textGenerationPrompts.ts";
@@ -194,9 +195,22 @@ export function fromRunner(name: string, run: Runner): ProviderTextGeneration {
     });
   });
 
+  const generatePullRequestAnswer: ProviderTextGeneration["generatePullRequestAnswer"] = Effect.fn(
+    `${name}.generatePullRequestAnswer`,
+  )(function* (input) {
+    const generated = yield* run({
+      operation: "generatePullRequestAnswer",
+      cwd: input.cwd,
+      modelSelection: input.modelSelection,
+      ...buildPullRequestAnswerPrompt(input),
+    });
+    return { answer: generated.answer.trim() };
+  });
+
   return {
     generateCommitMessage,
     generatePrContent,
+    generatePullRequestAnswer,
     generateBranchName,
     generateThreadTitle,
     generateReviewGuide,

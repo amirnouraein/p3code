@@ -40,7 +40,7 @@ interface DiffCommentAnnotationProps {
   placeholder?: string;
   submitLabel?: string;
   pending?: boolean;
-  secondaryAction?: DiffCommentSecondaryAction;
+  secondaryActions?: ReadonlyArray<DiffCommentSecondaryAction>;
   focusOnMount?: boolean;
   /** Set only for pull request comments, where `@` completes the repository's users. */
   completionScope?: PullRequestCompletionScope | null;
@@ -60,7 +60,7 @@ export function DiffCommentAnnotation({
   placeholder,
   submitLabel,
   pending = false,
-  secondaryAction,
+  secondaryActions = [],
   focusOnMount = true,
   completionScope = null,
 }: DiffCommentAnnotationProps) {
@@ -168,21 +168,22 @@ export function DiffCommentAnnotation({
         <Button variant="ghost-muted" size="xs" onClick={onCancel}>
           <T>Cancel</T>
         </Button>
-        {secondaryAction ? (
+        {secondaryActions.map((action) => (
           <Button
+            key={action.label}
             size="xs"
             variant="outline"
             disabled={
               speech?.preparing ||
               pending ||
-              (!speech?.blocksSubmission && !secondaryAction.allowEmpty && !trimmedText)
+              (!speech?.blocksSubmission && !action.allowEmpty && !trimmedText)
             }
-            onClick={() => submit(speech, secondaryAction.onAction, secondaryAction.allowEmpty)}
+            onClick={() => submit(speech, action.onAction, action.allowEmpty)}
           >
-            {secondaryAction.icon}
-            {secondaryAction.label}
+            {action.icon}
+            {action.label}
           </Button>
-        ) : null}
+        ))}
         <Button
           size="xs"
           disabled={speech?.preparing || pending || (!speech?.blocksSubmission && !trimmedText)}

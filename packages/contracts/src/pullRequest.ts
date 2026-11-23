@@ -931,6 +931,18 @@ export const PullRequestThreadCommentsInput = Schema.Struct({
 });
 export type PullRequestThreadCommentsInput = typeof PullRequestThreadCommentsInput.Type;
 
+/** A reviewer's question about selected diff lines, answered by a model without a thread. */
+export const PullRequestAskInput = Schema.Struct({
+  ...PullRequestRef.fields,
+  path: TrimmedNonEmptyString,
+  excerpt: Schema.String.check(Schema.isMaxLength(60_000)),
+  question: TrimmedNonEmptyString.check(Schema.isMaxLength(4_000)),
+});
+export type PullRequestAskInput = typeof PullRequestAskInput.Type;
+
+export const PullRequestAskResult = Schema.Struct({ answer: Schema.String });
+export type PullRequestAskResult = typeof PullRequestAskResult.Type;
+
 export const PullRequestThreadCommentsResult = Schema.Struct({
   comments: Schema.Array(PullRequestThreadComment),
   nextCursor: Schema.NullOr(TrimmedNonEmptyString),

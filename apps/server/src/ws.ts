@@ -2894,6 +2894,8 @@ export const layerWsRpc = (
           withPullRequestViewer(input, reviewGuides.get(input)),
         [WS_METHODS.pullRequestsGenerateReviewGuide]: (input) =>
           withPullRequestViewer(input, reviewGuides.generate(input)),
+        [WS_METHODS.pullRequestsAsk]: (input) =>
+          withPullRequestViewer(input, reviewGuides.ask(input)),
         [WS_METHODS.pullRequestsThreadComments]: (input) =>
           withPullRequestViewer(input, pullRequests.threadComments(input)),
         [WS_METHODS.pullRequestsDiffFileContents]: (input) =>

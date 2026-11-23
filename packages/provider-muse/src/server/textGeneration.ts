@@ -32,6 +32,7 @@ import {
   buildBranchNamePrompt,
   buildCommitMessagePrompt,
   buildPrContentPrompt,
+  buildPullRequestAnswerPrompt,
   buildThreadTitlePrompt,
 } from "@t3tools/provider-core/server/textGenerationPrompts";
 import {
@@ -392,6 +393,16 @@ export const makeMuseTextGeneration = Effect.fn("makeMuseTextGeneration")(functi
         modelSelection: input.modelSelection,
       });
     });
+  const generatePullRequestAnswer: ProviderTextGeneration["generatePullRequestAnswer"] = Effect.fn(
+    "MuseTextGeneration.generatePullRequestAnswer",
+  )(function* (input) {
+    const generated = yield* runMuseJson({
+      operation: "generatePullRequestAnswer",
+      ...buildPullRequestAnswerPrompt(input),
+      modelSelection: input.modelSelection,
+    });
+    return { answer: generated.answer.trim() };
+  });
   const generateReviewGuide: ProviderTextGeneration["generateReviewGuide"] = () =>
     Effect.fail(investigationUnsupported("generateReviewGuide", "Muse Code"));
   return {
@@ -400,6 +411,7 @@ export const makeMuseTextGeneration = Effect.fn("makeMuseTextGeneration")(functi
     generateBranchName,
     generateThreadTitle,
     generateReviewGuide,
+    generatePullRequestAnswer,
     generateTranscriptionPostProcessing,
   } satisfies ProviderTextGeneration;
 });

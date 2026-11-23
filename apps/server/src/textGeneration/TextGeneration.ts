@@ -47,6 +47,7 @@ type TextGenerationOp =
   | "generateBranchName"
   | "generateThreadTitle"
   | "generateReviewGuide"
+  | "generatePullRequestAnswer"
   | "generateTranscriptionPostProcessing";
 
 const resolveInstance = (
@@ -206,6 +207,17 @@ export const make = Effect.gen(function* () {
         (service, modelSelection) => service.generateReviewGuide({ ...input, modelSelection }),
       );
     }),
+    generatePullRequestAnswer: Effect.fn("TextGeneration.generatePullRequestAnswer")(
+      function (input) {
+        return generate(
+          "generatePullRequestAnswer",
+          input.modelSelection,
+          input.projectId,
+          (service, modelSelection) =>
+            service.generatePullRequestAnswer({ ...input, modelSelection }),
+        );
+      },
+    ),
     generateTranscriptionPostProcessing: Effect.fn(
       "TextGeneration.generateTranscriptionPostProcessing",
     )(function (input) {

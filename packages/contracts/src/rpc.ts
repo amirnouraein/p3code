@@ -228,6 +228,8 @@ import {
 import { PullRequestReviewGuideResult } from "./pullRequestReviewGuide.ts";
 import {
   PullRequestActionInput,
+  PullRequestAskInput,
+  PullRequestAskResult,
   PullRequestActivity,
   PullRequestChangeBreakdown,
   PullRequestCommentInput,
@@ -676,6 +678,7 @@ export const WS_METHODS = {
   pullRequestsActivity: "pullRequests.activity",
   pullRequestsReviewGuide: "pullRequests.reviewGuide",
   pullRequestsGenerateReviewGuide: "pullRequests.generateReviewGuide",
+  pullRequestsAsk: "pullRequests.ask",
   pullRequestsThreadComments: "pullRequests.threadComments",
   pullRequestsDiffFileContents: "pullRequests.diffFileContents",
   pullRequestsFilesViewed: "pullRequests.filesViewed",
@@ -1299,6 +1302,12 @@ const WsPullRequestsReviewGuideRpc = Rpc.make(WS_METHODS.pullRequestsReviewGuide
 const WsPullRequestsGenerateReviewGuideRpc = Rpc.make(WS_METHODS.pullRequestsGenerateReviewGuide, {
   payload: PullRequestRef,
   success: PullRequestReviewGuideResult,
+  error: PullRequestRpcError,
+});
+
+const WsPullRequestsAskRpc = Rpc.make(WS_METHODS.pullRequestsAsk, {
+  payload: PullRequestAskInput,
+  success: PullRequestAskResult,
   error: PullRequestRpcError,
 });
 
@@ -2586,6 +2595,7 @@ export const WsRpcGroup = RpcGroup.make(
   WsPullRequestsActivityRpc,
   WsPullRequestsReviewGuideRpc,
   WsPullRequestsGenerateReviewGuideRpc,
+  WsPullRequestsAskRpc,
   WsPullRequestsThreadCommentsRpc,
   WsPullRequestsDiffFileContentsRpc,
   WsPullRequestsFilesViewedRpc,
