@@ -150,6 +150,8 @@ export interface PullRequestAnswerPromptInput {
   title: string;
   description: string;
   path: string;
+  /** The file as the pull request leaves it; empty when it could not be read. */
+  fileContents: string;
   excerpt: string;
   question: string;
 }
@@ -170,6 +172,9 @@ export function buildPullRequestAnswerPrompt(input: PullRequestAnswerPromptInput
     "END PULL REQUEST DESCRIPTION",
     "",
     `File: ${input.path}`,
+    ...(input.fileContents.length > 0
+      ? ["Whole file:", limitSection(input.fileContents, 100_000), ""]
+      : []),
     "Selected lines:",
     limitSection(input.excerpt, 40_000),
     "",

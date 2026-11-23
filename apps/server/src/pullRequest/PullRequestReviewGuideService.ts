@@ -535,9 +535,12 @@ const make = Effect.gen(function* () {
     "PullRequestReviewGuideService.ask",
   )(function* (input) {
     const { workspaceRoot } = yield* keyFor(input);
-    const [detail, settings, providers] = yield* Effect.all(
+    const { excerpt: _excerpt, question: _question, ...fileInput } = input;
+    const [detail, file, settings, providers] = yield* Effect.all(
       [
         pullRequests.detail(input),
+        // An answer from the selected lines alone beats none when the file cannot be read.
+        pullRequests.diffFileContents(fileInput).pipe(Effect.orElseSucceed(() => null)),
         serverSettings.getSettings.pipe(
           Effect.mapError(
             (cause) =>
@@ -564,7 +567,9 @@ const make = Effect.gen(function* () {
         number: detail.number,
         title: detail.title,
         description: detail.body,
-        path: input.path,
+        path: input.newPath,
+        fileContents:
+          file === null ? "" : input.changeType === "deleted" ? file.oldContents : file.newContents,
         excerpt: input.excerpt,
         question: input.question,
       })

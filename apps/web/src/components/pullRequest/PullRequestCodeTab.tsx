@@ -1235,6 +1235,8 @@ function PullRequestCodeTab({
 
   const askAboutSelection = (anchor: DraftAnchor, question: string) => {
     const { side, line } = getReviewPositionAnchor(anchor.position);
+    const file = files.find((candidate) => buildFileDiffRenderKey(candidate) === anchor.fileKey);
+    if (file === undefined) return;
     finishSelection(anchor, question, (comment) => {
       const id = nextPendingReviewCommentId();
       const settle = (status: PullRequestLineAnswer["status"], text: string) =>
@@ -1256,7 +1258,14 @@ function PullRequestCodeTab({
       ]);
       void askCommand({
         environmentId,
-        input: { ...reference, path: anchor.path, excerpt: comment.diff, question },
+        input: {
+          ...reference,
+          changeType: file.type,
+          oldPath: anchor.oldPath ?? anchor.path,
+          newPath: anchor.path,
+          excerpt: comment.diff,
+          question,
+        },
       }).then((result) =>
         result._tag === "Success"
           ? settle("answered", result.value.answer)

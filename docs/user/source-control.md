@@ -246,8 +246,8 @@ changed-line link opens the file at those lines, a checks link opens the checks,
 opens that commit's changes. On web and desktop, hovering a comment or commit link previews it.
 
 On web and desktop, select lines in the **Code** tab and choose **Ask** to get an answer under
-those lines. The review guide model answers from the selected lines and the description, without
-reading the rest of the checkout. Answers are not saved and are gone when you leave the review.
+those lines. The review guide model answers from the whole file as the pull request leaves it, the
+selected lines, and the description. Answers are not saved and are gone when you leave the review.
 For a longer conversation, choose **Add to agent** to take the lines to a chat.
 
 On mobile, **Pull requests** lists reviews across your connected environments. Open a review

@@ -191,6 +191,7 @@ const makeLayer = (input: {
         activity: () => Effect.succeed(activity),
         invalidate: () => Effect.void,
         stack: () => Effect.succeed(stack(input)),
+        diffFileContents: () => Effect.succeed({ oldContents: "old", newContents: "whole file" }),
       } as unknown as PullRequestService.PullRequestService["Service"]),
     ),
     Layer.provide(
@@ -647,8 +648,14 @@ it.layer(layerBase, { excludeTestServices: true })("PullRequestReviewGuideServic
                   }),
                 )
               : Effect.succeed({
-                  answer: [input.cwd, input.title, input.description, input.path, input.excerpt]
-                    .join("|"),
+                  answer: [
+                    input.cwd,
+                    input.title,
+                    input.description,
+                    input.path,
+                    input.fileContents,
+                    input.excerpt,
+                  ].join("|"),
                 }),
         }),
       );
@@ -656,11 +663,17 @@ it.layer(layerBase, { excludeTestServices: true })("PullRequestReviewGuideServic
         context,
         PullRequestReviewGuideService.PullRequestReviewGuideService,
       );
-      const asked = { ...reference, path: "src/a.ts", excerpt: "+x" };
+      const asked = {
+        ...reference,
+        changeType: "change" as const,
+        oldPath: "src/a.ts",
+        newPath: "src/a.ts",
+        excerpt: "+x",
+      };
       const answered = yield* service.ask({ ...asked, question: "Why?" });
       assert.strictEqual(
         answered.answer,
-        `${repositories.workspace}|Add the feature|Adds the feature.|src/a.ts|+x`,
+        `${repositories.workspace}|Add the feature|Adds the feature.|src/a.ts|whole file|+x`,
       );
       const failed = yield* Effect.flip(service.ask({ ...asked, question: "Fail?" }));
       assert.include(failed.message, "out of credits");

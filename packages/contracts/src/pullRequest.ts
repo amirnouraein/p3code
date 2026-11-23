@@ -778,6 +778,17 @@ export const PullRequestDiffFileContentsResult = Schema.Struct({
 });
 export type PullRequestDiffFileContentsResult = typeof PullRequestDiffFileContentsResult.Type;
 
+/** A reviewer's question about selected diff lines, answered by a model without a thread. */
+export const PullRequestAskInput = Schema.Struct({
+  ...PullRequestDiffFileContentsInput.fields,
+  excerpt: Schema.String.check(Schema.isMaxLength(60_000)),
+  question: TrimmedNonEmptyString.check(Schema.isMaxLength(4_000)),
+});
+export type PullRequestAskInput = typeof PullRequestAskInput.Type;
+
+export const PullRequestAskResult = Schema.Struct({ answer: Schema.String });
+export type PullRequestAskResult = typeof PullRequestAskResult.Type;
+
 const MAX_FILE_PATH_LENGTH = 4096;
 // Preserve filename whitespace so viewed marks match host paths.
 const FilePath = Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(MAX_FILE_PATH_LENGTH));
@@ -930,18 +941,6 @@ export const PullRequestThreadCommentsInput = Schema.Struct({
   cursor: TrimmedNonEmptyString,
 });
 export type PullRequestThreadCommentsInput = typeof PullRequestThreadCommentsInput.Type;
-
-/** A reviewer's question about selected diff lines, answered by a model without a thread. */
-export const PullRequestAskInput = Schema.Struct({
-  ...PullRequestRef.fields,
-  path: TrimmedNonEmptyString,
-  excerpt: Schema.String.check(Schema.isMaxLength(60_000)),
-  question: TrimmedNonEmptyString.check(Schema.isMaxLength(4_000)),
-});
-export type PullRequestAskInput = typeof PullRequestAskInput.Type;
-
-export const PullRequestAskResult = Schema.Struct({ answer: Schema.String });
-export type PullRequestAskResult = typeof PullRequestAskResult.Type;
 
 export const PullRequestThreadCommentsResult = Schema.Struct({
   comments: Schema.Array(PullRequestThreadComment),
