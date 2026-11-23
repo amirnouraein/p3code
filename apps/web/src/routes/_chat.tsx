@@ -6,6 +6,7 @@ import { isAppModalPage } from "../components/sidebar/mainAppLocation";
 import { SidebarInset } from "../components/ui/sidebar";
 import { resolveThreadRouteTarget } from "../threadRoutes";
 import { retainThreadFindForRoute } from "../components/chat/threadFindStore";
+import { RetainedPullRequestsPage } from "../components/pullRequest/RetainedPullRequestsPage";
 import { ThreadLinkPrompt } from "../components/promptLinks/ThreadLinkPrompt";
 import { useShownThreadRouteTarget } from "../hooks/useShownThreadRouteTarget";
 
@@ -24,6 +25,7 @@ function ChatRouteLayout() {
       ) : (
         <Outlet />
       )}
+      <RetainedPullRequestsPage />
       {modalOpen ? <Outlet /> : null}
       <GlobalVoiceInputIndicator hidden={modalOpen} />
     </>

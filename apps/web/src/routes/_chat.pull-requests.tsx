@@ -4,7 +4,6 @@ import { createFileRoute } from "@tanstack/react-router";
 import { type PullRequestListSort } from "../components/pullRequest/pullRequestListPreferences";
 import { SORT_OPTIONS } from "../components/pullRequest/pullRequestListOptions";
 import { type PullRequestsSearch } from "../components/pullRequest/usePullRequestListView";
-import { PullRequestsPage } from "../components/pullRequest/PullRequestsPage";
 
 const MAX_SEARCH_LABEL_CANDIDATES = 100;
 
@@ -74,5 +73,4 @@ export const Route = createFileRoute("/_chat/pull-requests")({
     authors: pullRequestSearchValues(raw.authors ?? raw.author, 10),
     labels: pullRequestSearchValues(raw.labels, 10),
   }),
-  component: PullRequestsPage,
 });
