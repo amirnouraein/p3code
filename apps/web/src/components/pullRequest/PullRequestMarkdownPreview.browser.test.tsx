@@ -35,3 +35,29 @@ it.each([
   await userEvent.click(button!);
   expect(onComment).toHaveBeenCalledWith({ start: line, end: line });
 });
+
+it("finds text in the rendered file with Cmd+F", async () => {
+  await using screen = await render(
+    <PullRequestMarkdownPreview
+      contents={Promise.resolve("# Title\n\nFirst paragraph.\n\nSecond paragraph.\n")}
+      path="docs/readme.md"
+      cwd="/repo"
+      environmentId={EnvironmentId.make("local")}
+      repository="acme/app"
+      annotations={[]}
+      onComment={() => {}}
+    />,
+  );
+  await userEvent.click(screen.getByText("Second paragraph."));
+  await userEvent.keyboard("{Meta>}f{/Meta}");
+  const input = screen.getByRole("searchbox", { name: "Find in page" });
+  await expect.element(input).toHaveFocus();
+  await userEvent.type(input, "PARAGRAPH");
+  await expect.element(screen.getByText("1/2")).toBeInTheDocument();
+  expect(CSS.highlights.get("t3-markdown-find")?.size).toBe(2);
+  await userEvent.keyboard("{Enter}");
+  await expect.element(screen.getByText("2/2")).toBeInTheDocument();
+  await userEvent.keyboard("{Escape}");
+  await expect.element(input).not.toBeInTheDocument();
+  expect(CSS.highlights.has("t3-markdown-find")).toBe(false);
+});
