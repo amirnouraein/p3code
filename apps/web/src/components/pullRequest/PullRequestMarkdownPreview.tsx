@@ -52,11 +52,23 @@ function findRanges(root: HTMLElement, query: string): Range[] {
   return ranges;
 }
 
+/**
+ * The parent of the nearest vertical scroller, where a bar pinned over the scroller stays put.
+ * Sticky cannot: the diff viewer's own clipping layers sit between the preview and the scroller.
+ */
+function findBarHost(element: HTMLElement): HTMLElement | null {
+  for (let node = element.parentElement; node !== null; node = node.parentElement) {
+    if (/auto|scroll/.test(getComputedStyle(node).overflowY)) return node.parentElement;
+  }
+  return null;
+}
+
 interface FindState {
   readonly query: string;
   readonly active: number;
   /** Bumped by each find shortcut, so an open bar refocuses its input. */
   readonly focus: number;
+  readonly host: HTMLElement | null;
 }
 
 export interface MarkdownPreviewAnnotation {
@@ -111,6 +123,7 @@ function MarkdownPreviewBody(props: MarkdownPreviewProps) {
   const [find, setFind] = useState<FindState | null>(null);
   const [matchCount, setMatchCount] = useState(0);
   const previewRef = useRef<HTMLDivElement | null>(null);
+  const findBarRef = useRef<HTMLDivElement | null>(null);
   const markdownRef = useRef<HTMLDivElement | null>(null);
   const bindRoot = (node: HTMLDivElement | null) => {
     markdownRef.current = node;
@@ -167,17 +180,27 @@ function MarkdownPreviewBody(props: MarkdownPreviewProps) {
     };
     // oxlint-disable-next-line react/exhaustive-effect-dependencies -- new text remounts the rendered DOM, whose old ranges would be detached.
   }, [find, text]);
-  const openFind = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key.toLowerCase() !== "f" || !(event.metaKey || event.ctrlKey)) return;
-    if (event.altKey || event.shiftKey) return;
-    event.preventDefault();
-    event.stopPropagation();
-    setFind((current) => ({
-      query: current?.query ?? "",
-      active: current?.active ?? 0,
-      focus: (current?.focus ?? 0) + 1,
-    }));
-  };
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- window capture keydown takes Cmd+F before the diff viewer's own search, which only searches diff rows
+  useEffect(() => {
+    const onKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.defaultPrevented || event.key.toLowerCase() !== "f") return;
+      if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) return;
+      const preview = previewRef.current;
+      const target = event.target instanceof Node ? event.target : null;
+      if (preview === null || target === null) return;
+      if (!preview.contains(target) && !findBarRef.current?.contains(target)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      setFind((current) => ({
+        query: current?.query ?? "",
+        active: current?.active ?? 0,
+        focus: (current?.focus ?? 0) + 1,
+        host: current?.host ?? findBarHost(preview),
+      }));
+    };
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, []);
   const stepFind = (by: number) =>
     setFind((current) => current && { ...current, active: current.active + by });
   const closeFind = () => {
@@ -202,82 +225,86 @@ function MarkdownPreviewBody(props: MarkdownPreviewProps) {
         ? "0/0"
         : `${(((find.active % matchCount) + matchCount) % matchCount) + 1}/${matchCount}`;
 
+  const findBar = (className: string) =>
+    find === null ? null : (
+      <div ref={findBarRef} data-owns-find="" className={className}>
+        <InputGroup
+          variant="popover"
+          size="lg"
+          role="search"
+          aria-label={gt("Find in page")}
+          className="w-[min(22rem,100%)]"
+        >
+          <InputGroupInput
+            key={find.focus}
+            autoFocus
+            onFocus={(event) => event.currentTarget.select()}
+            type="search"
+            size="sm"
+            value={find.query}
+            aria-label={gt("Find in page")}
+            placeholder={gt("Find in page")}
+            maxLength={200}
+            spellCheck={false}
+            autoComplete="off"
+            onChange={(event) => setFind({ ...find, query: event.target.value, active: 0 })}
+            onKeyDown={onFindKeyDown}
+          />
+          <InputGroupAddon align="inline-end" inset="pill">
+            <span
+              aria-live="polite"
+              className={cn(
+                "min-w-10 text-center text-xs tabular-nums",
+                findCount === "0/0" ? "text-destructive" : "text-muted-foreground",
+              )}
+            >
+              {findCount}
+            </span>
+            <Button
+              size="icon-xs"
+              variant="ghost"
+              aria-label={gt("Previous match")}
+              disabled={matchCount === 0 || find.query.length === 0}
+              onClick={() => stepFind(-1)}
+            >
+              <ChevronUpIcon />
+            </Button>
+            <Button
+              size="icon-xs"
+              variant="ghost"
+              aria-label={gt("Next match")}
+              disabled={matchCount === 0 || find.query.length === 0}
+              onClick={() => stepFind(1)}
+            >
+              <ChevronDownIcon />
+            </Button>
+            <Button
+              size="icon-xs"
+              variant="ghost"
+              aria-label={gt("Close find")}
+              onClick={closeFind}
+            >
+              <XIcon />
+            </Button>
+          </InputGroupAddon>
+        </InputGroup>
+      </div>
+    );
+
   const lastSeparator = props.path.lastIndexOf("/");
   const directory = lastSeparator === -1 ? "" : props.path.slice(0, lastSeparator);
 
   return (
     // Focusable so a click into the text takes Cmd+F here; the desktop app has no find-in-page.
-    <div
-      ref={previewRef}
-      tabIndex={-1}
-      data-owns-find=""
-      onKeyDown={openFind}
-      className="font-sans outline-none"
-    >
-      {find === null ? null : (
-        <div className="sticky top-2 z-20 flex justify-end px-3">
-          <InputGroup
-            variant="popover"
-            size="lg"
-            role="search"
-            aria-label={gt("Find in page")}
-            className="w-[min(22rem,100%)]"
-          >
-            <InputGroupInput
-              key={find.focus}
-              autoFocus
-              onFocus={(event) => event.currentTarget.select()}
-              type="search"
-              size="sm"
-              value={find.query}
-              aria-label={gt("Find in page")}
-              placeholder={gt("Find in page")}
-              maxLength={200}
-              spellCheck={false}
-              autoComplete="off"
-              onChange={(event) => setFind({ ...find, query: event.target.value, active: 0 })}
-              onKeyDown={onFindKeyDown}
-            />
-            <InputGroupAddon align="inline-end" inset="pill">
-              <span
-                aria-live="polite"
-                className={cn(
-                  "min-w-10 text-center text-xs tabular-nums",
-                  findCount === "0/0" ? "text-destructive" : "text-muted-foreground",
-                )}
-              >
-                {findCount}
-              </span>
-              <Button
-                size="icon-xs"
-                variant="ghost"
-                aria-label={gt("Previous match")}
-                disabled={matchCount === 0 || find.query.length === 0}
-                onClick={() => stepFind(-1)}
-              >
-                <ChevronUpIcon />
-              </Button>
-              <Button
-                size="icon-xs"
-                variant="ghost"
-                aria-label={gt("Next match")}
-                disabled={matchCount === 0 || find.query.length === 0}
-                onClick={() => stepFind(1)}
-              >
-                <ChevronDownIcon />
-              </Button>
-              <Button
-                size="icon-xs"
-                variant="ghost"
-                aria-label={gt("Close find")}
-                onClick={closeFind}
-              >
-                <XIcon />
-              </Button>
-            </InputGroupAddon>
-          </InputGroup>
-        </div>
-      )}
+    <div ref={previewRef} tabIndex={-1} data-owns-find="" className="font-sans outline-none">
+      {find === null
+        ? null
+        : find.host === null
+          ? findBar("sticky top-2 z-20 flex justify-end px-3")
+          : createPortal(
+              findBar("absolute top-3 right-3 z-40 w-[min(22rem,calc(100%-1.5rem))]"),
+              find.host,
+            )}
       {leading.length > 0 ? <div className="px-3">{leading}</div> : null}
       <div key={text} ref={bindRoot}>
         <ChatMarkdown

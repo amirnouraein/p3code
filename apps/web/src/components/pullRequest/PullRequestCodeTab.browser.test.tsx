@@ -15,7 +15,7 @@ import { __setClientSettingsForTests } from "../../hooks/useSettings";
 import { setAppearanceMode } from "../../hooks/useTheme";
 import { DEFAULT_CLIENT_SETTINGS } from "@t3tools/contracts/settings";
 
-const { diffAtom, testFileDiffAtom, pagedDiffAtom } = await vi.hoisted(async () => {
+const { diffAtom, mdDiffAtom, testFileDiffAtom, pagedDiffAtom } = await vi.hoisted(async () => {
   const { AsyncResult, Atom } = await import("effect/reactivity");
   const filePatch = (path: string, addition = "after()") =>
     [
@@ -59,6 +59,9 @@ const { diffAtom, testFileDiffAtom, pagedDiffAtom } = await vi.hoisted(async () 
     // An environment query whose refetch returns equal content hands back the previous value
     // itself, so a refresh publishes a new result around the very same page.
     diffAtom: Atom.make(() => AsyncResult.success(firstPage)),
+    mdDiffAtom: Atom.make(() =>
+      AsyncResult.success({ patch: filePatch("README.md"), truncated: false, nextCursor: null }),
+    ),
     testFileDiffAtom: Atom.make(() =>
       AsyncResult.success({
         patch:
@@ -78,6 +81,8 @@ const mocks = vi.hoisted(() => ({
   paged: false,
   shortPages: false,
   withTestFile: false,
+  markdown: false,
+  command: (() => undefined) as (...args: never[]) => unknown,
   refreshed: false,
   diffCommits: [] as Array<string | undefined>,
   viewedPaths: null as ReadonlySet<string> | null,
@@ -91,7 +96,7 @@ function deliverViewedPaths(paths: ReadonlySet<string> | null) {
 
 vi.mock(import("~/state/use-atom-command"), async (original) => ({
   ...(await original()),
-  useAtomCommand: (() => vi.fn()) as never,
+  useAtomCommand: (() => mocks.command) as never,
 }));
 vi.mock(import("./usePullRequestFilesViewed"), async () => {
   const { useSyncExternalStore } = await import("react");
@@ -128,6 +133,7 @@ vi.mock(import("~/state/pullRequests"), async (original) => {
       diff: (({ input }: { input: { cursor?: string; commit?: string } }) => {
         mocks.diffCommits.push(input.commit);
         if (mocks.paged) return pagedDiffAtom(mocks.shortPages)(input.cursor ?? "first");
+        if (mocks.markdown) return mdDiffAtom;
         return mocks.withTestFile ? testFileDiffAtom : diffAtom;
       }) as never,
     },
@@ -197,6 +203,8 @@ function setup({ paged }: { paged: boolean }) {
   mocks.paged = paged;
   mocks.shortPages = false;
   mocks.withTestFile = false;
+  mocks.markdown = false;
+  mocks.command = vi.fn();
   mocks.refreshed = false;
   mocks.diffCommits = [];
   mocks.viewedPaths = null;
@@ -741,4 +749,44 @@ it("hands panel focus from the loading diff to the diff once the diff workers st
   await vi.waitFor(() =>
     expect(document.activeElement).toBe(container.querySelector(".diff-render-surface")),
   );
+});
+
+it("finds text with Cmd+F in a Markdown file shown rendered, not with the diff's own search", async () => {
+  setup({ paged: false });
+  __setClientSettingsForTests({ ...DEFAULT_CLIENT_SETTINGS, diffFilesCollapsed: false });
+  using _preferences = {
+    [Symbol.dispose]() {
+      __setClientSettingsForTests(DEFAULT_CLIENT_SETTINGS);
+    },
+  };
+  mocks.markdown = true;
+  mocks.command = async () => ({
+    _tag: "Success",
+    value: { newContents: "# Title\n\nFirst paragraph.\n\nSecond paragraph.\n" },
+  });
+  const container = document.createElement("div");
+  container.className = "flex h-[700px] w-[900px]";
+  await using screen = await render(tab(0), { container });
+  await expect
+    .element(screen.getByRole("button", { name: "Preview Markdown" }))
+    .toBeInTheDocument();
+  (screen.getByRole("button", { name: "Preview Markdown" }).element() as HTMLElement).click();
+  const preview = await vi.waitFor(() => {
+    const found = container.querySelector<HTMLElement>("[data-owns-find]");
+    expect(found?.textContent).toContain("Second paragraph.");
+    expect(found?.offsetHeight).toBeGreaterThan(0);
+    return found!;
+  });
+  preview.focus();
+  expect(document.activeElement).toBe(preview);
+  await userEvent.keyboard("{Meta>}f{/Meta}");
+  const input = await vi.waitFor(() => {
+    const found = container.querySelector<HTMLInputElement>("input[aria-label='Find in page']");
+    expect(found).not.toBeNull();
+    return found!;
+  });
+  input.focus();
+  await userEvent.keyboard("paragraph");
+  const bar = input.closest<HTMLElement>("[data-owns-find]")!;
+  await vi.waitFor(() => expect(bar.textContent).toContain("1/2"));
 });
